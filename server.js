@@ -42,8 +42,8 @@ app.use('/', router);
 app.set('views', __dirname + '/src/views');
 app.set('view engine', 'ejs');
 
-http.createServer(app).listen(9080);
+http.createServer(app).listen(7080);
 
 if (https_ok) {
-	https.createServer(https_options, app).listen(9443);
+	https.createServer(https_options, app).listen(7443);
 }
