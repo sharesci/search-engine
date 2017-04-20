@@ -8,7 +8,7 @@ var request = require('request'),
 // Connection URL
 var mongo_url = 'mongodb://localhost:27017/sharesci';
 
-var first_url = 'http://export.arxiv.org/oai2?verb=ListRecords&metadataPrefix=arXiv&from=2017-04-11';
+var first_url = 'http://export.arxiv.org/oai2?verb=ListRecords&metadataPrefix=arXiv&from=2010-01-01';
 var resume_url = 'http://export.arxiv.org/oai2?verb=ListRecords&resumptionToken=';
 
 
@@ -88,5 +88,5 @@ function harvestOAI(url, last_promise) {
 }
 
 
-(new Promise((resolve,reject)=>{mongoClearPapers(resolve);})).then((val)=>{harvestOAI(first_url, Promise.resolve(0));});
+(new Promise((resolve,reject)=>{resolve(0);})).then((val)=>{harvestOAI(first_url, Promise.resolve(val));});
 
