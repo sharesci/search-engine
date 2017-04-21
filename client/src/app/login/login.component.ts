@@ -2,7 +2,8 @@ import { Component } from '@angular/core';
 
 @Component({
     selector: 'ss-login',
-    templateUrl: 'src/app/login/login.component.html'
+    templateUrl: 'src/app/login/login.component.html',
+    styleUrls: ['src/app/login/login.component.css']
 })
 
 export class LoginComponent {

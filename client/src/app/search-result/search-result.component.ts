@@ -4,7 +4,8 @@ import { ISearchResult } from './search-result'
 
 @Component({
     selector: 'ss-search-result',
-    templateUrl: 'src/app/search-result/search-result.component.html'
+    templateUrl: 'src/app/search-result/search-result.component.html',
+    styleUrls: ['src/app/search-result/search-result.component.css']
 })
 
 export class SearchResultComponent {
