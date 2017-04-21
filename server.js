@@ -4,7 +4,6 @@ const
 	https = require('https'),
 	http = require('http'),
 	fs = require('fs'),
-	router = require('./config/routes.js');
 	rootRouter = require('./routes/index');
 
 const app = express();
@@ -36,11 +35,7 @@ app.use(express_session({
 	cookie: { maxAge: 60*1000 }
 }));
 app.use('/', rootRouter);
-
-
-app.use('/', router);
-app.set('views', __dirname + '/src/views');
-app.set('view engine', 'ejs');
+app.use('/', express.static(__dirname + '/client'));
 
 http.createServer(app).listen(7080);
 
