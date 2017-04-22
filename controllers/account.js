@@ -9,8 +9,11 @@ function index(req, res) {
 }
 
 function createAction(req, res) {
+	var responseObj = {
+		errno: 0,
+		errstr: ""
+	};
 	var passsalt = bcrypt.genSaltSync(10);
-	console.log(passsalt);
 	var passhash = bcrypt.hashSync(req.body.password, passsalt);
 	const query = 'INSERT INTO account (username, passhash) VALUES (${username}, ${passhash});';
 	var values = {
@@ -19,12 +22,23 @@ function createAction(req, res) {
 	};
 	pgdb.any(query, values)
 		.then((data) => {
-			res.redirect('/');
+			responseObj.errno = 0;
+			responseObj.errstr = "";
+			res.json(responseObj);
 			res.end();
 		})
 		.catch((err) => {
-			console.error(err);
-			res.writeHead(500);
+			if (err.code === '23505') {
+				// Violated 'UNIQUE' constraint, so username was already in use
+				responseObj.errno = 2;
+				responseObj.errstr = "Incorrect username";
+				res.json(responseObj);
+			} else {
+				console.error(err);
+				responseObj.errno = 1;
+				responseObj.errstr = "Unknown error";
+				res.json(responseObj);
+			}
 			res.end();
 		});
 }

@@ -4,12 +4,15 @@ const
 
 
 function loginAction(req, res)  {
+	var responseObj = {
+		errno: 0,
+		errstr: ""
+	};
 	if(req.session.user_id) {
-		if (req.body.successRedirect) {
-			res.redirect(req.body.successRedirect);
-		} else {
-			res.redirect('/');
-		}
+		responseObj.errno = 4;
+		responseObj.errstr = "Already logged in";
+		res.json(responseObj);
+		res.end();
 	}
 	const query = 'SELECT passhash FROM account WHERE username = ${username};';
 	var values = {
@@ -19,29 +22,27 @@ function loginAction(req, res)  {
 		.then((data) => {
 			if (bcrypt.compareSync(req.body.password, data['passhash'])) {
 				req.session.user_id = req.body.username;
-				if (req.body.successRedirect) {
-					res.redirect(req.body.successRedirect);
-				} else {
-					res.redirect('/');
-				}
-			} else if (req.body.failureRedirect) {
-				res.redirect(req.body.failureRedirect);
+				responseObj.errno = 0;
+				responseObj.errstr = "";
+				res.json(responseObj);
 			} else {
-				res.redirect('/');
+				responseObj.errno = 3;
+				responseObj.errstr = "Incorrect password";
+				res.json(responseObj);
 			}
 			res.end();
 		})
 		.catch((err) => {
 			if(err.received === 0) {
 				console.log('Invalid username \'' + req.body.username + '\' tried to log in.');
+				responseObj.errno = 2;
+				responseObj.errstr = "Incorrect username";
 			} else {
 				console.error(err);
+				responseObj.errno = 1;
+				responseObj.errstr = "Unknown error";
 			}
-			if (req.body.failureRedirect) {
-				res.redirect(req.body.failureRedirect);
-			} else {
-				res.redirect('/');
-			}
+			res.json(responseObj);
 			res.end();
 		});
 }
