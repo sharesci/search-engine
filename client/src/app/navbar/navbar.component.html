@@ -1,4 +1,4 @@
-<nav class="navbar navbar-inverse navbar-fixed-top">
+<nav class="navbar navbar-default navbar-fixed-top">
 	<div class="container">
 		<div class="navbar-header">
 			<a class="navbar-brand" [routerLink]="['/home']" href="#">ShareSci</a>
@@ -6,8 +6,9 @@
 
 		<div class="navbar-collapse collapse" id="searchbar">
 			<ul class="nav navbar-nav navbar-right">
-				<li *ngIf='ishome == false'><a href="#"><span class="glyphicon glyphicon-upload"></span> Upload</a></li>
-				<li><a [routerLink]="['/login']" href="#"><span class="glyphicon glyphicon-log-in"></span> Login</a></li>
+				<li *ngIf='hideLoginBtn == true'><a href="#"><span class="glyphicon glyphicon-upload"></span> Upload</a></li>
+				<li *ngIf='hideLoginBtn == false'><a [routerLink]="['/login']" href="#"><span class="glyphicon glyphicon-log-in"></span> Login</a></li>
+				<li *ngIf='hideLoginBtn == true'><a [routerLink]="['/logout']" href="#"><span class="glyphicon glyphicon-log-out"></span> Logout</a></li>
 			</ul>
 
 			<form *ngIf='ishome == false' class="navbar-form">

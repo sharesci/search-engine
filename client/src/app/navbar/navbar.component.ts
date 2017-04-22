@@ -1,4 +1,6 @@
 import { Component, Input } from '@angular/core';
+import { LoginComponent } from '../login/login.component.js';
+import { AuthenticationService } from '../services/authentication.service.js'
 
 @Component({
     selector: 'ss-navbar',
@@ -6,5 +8,13 @@ import { Component, Input } from '@angular/core';
 })
 
 export class NavbarComponent {
-    @Input() ishome: string;
+    hideLoginBtn: boolean = false;
+
+    constructor(private _authenticationService: AuthenticationService) { 
+        _authenticationService.isUserLoggedIn$.subscribe(
+            isUserLoggedIn => { this.hideLoginBtn = isUserLoggedIn }
+        );
+    }
+
+   
 }
