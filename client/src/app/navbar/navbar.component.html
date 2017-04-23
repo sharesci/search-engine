@@ -8,7 +8,7 @@
 			<ul class="nav navbar-nav navbar-right">
 				<li *ngIf='hideLoginBtn == true'><a href="#"><span class="glyphicon glyphicon-upload"></span> Upload</a></li>
 				<li *ngIf='hideLoginBtn == false'><a [routerLink]="['/login']" href="#"><span class="glyphicon glyphicon-log-in"></span> Login</a></li>
-				<li *ngIf='hideLoginBtn == true'><a [routerLink]="['/logout']" href="#"><span class="glyphicon glyphicon-log-out"></span> Logout</a></li>
+				<li *ngIf='hideLoginBtn == true'><a href="#" (click)="logout()"><span class="glyphicon glyphicon-log-out"></span> Logout</a></li>
 			</ul>
 
 			<form *ngIf='ishome == false' class="navbar-form">
@@ -23,7 +23,6 @@
 					</div>
 				</div>
 			</form>
-
 		</div>
 	</div>
 </nav>

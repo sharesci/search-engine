@@ -6,7 +6,7 @@ import { AccountService } from '../services/account.service.js';
     templateUrl: 'src/app/create-account/create-account.component.html',
 })
 
-export class CreateAccountComponent {
+export class CreateAccountComponent{
     username: string;
     password: string;
     errstr: string;

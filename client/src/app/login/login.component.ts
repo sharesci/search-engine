@@ -1,5 +1,4 @@
 import { Component } from '@angular/core';
-import { Router } from '@angular/router';
 import { AuthenticationService } from '../services/authentication.service.js';
 
 @Component({
@@ -14,9 +13,7 @@ export class LoginComponent {
     password: string;
     errstr: string;
 
-    constructor(private _authenticationService: AuthenticationService,
-        private _routerService: Router) {
-    }
+    constructor(private _authenticationService: AuthenticationService) { }
 
     login() {
         this._authenticationService.login(this.username, this.password)
@@ -24,13 +21,6 @@ export class LoginComponent {
                 result => this.handleLoginResult(result),
                 error => console.log(error)
             );
-    }
-
-    logout() {
-        this._authenticationService.logout()
-            .subscribe(null, null, () => {
-                localStorage.removeItem('currentUser');
-        })
     }
 
     handleLoginResult(result: any) {

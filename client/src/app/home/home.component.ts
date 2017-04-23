@@ -8,4 +8,6 @@ import { Component } from '@angular/core';
 
 export class HomeComponent {
     logo: string = 'src/media/logo.jpg';
+
+    constructor(){ }
 }
