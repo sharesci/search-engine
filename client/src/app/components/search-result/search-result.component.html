@@ -1,0 +1,47 @@
+<div class="container search-container">
+	<div class="mb20">
+		<h1>Search Results</h1>
+		<h2 class="lead"><strong class="text-danger">{{search_results.length}}</strong> results were found for the search for <strong class="text-danger">Neural Networks</strong></h2>
+	</div>
+
+	<section class="col-xs-12 col-sm-6 col-md-12" *ngFor='let result of search_results'>
+		<article class="search-result row">
+			<div class="col-xs-12 col-sm-12 col-md-8">
+				<h3><a href="#" title="">{{result.title}}</a></h3>
+				<ul class="meta-search list-inline">
+					<!--<li><span>{{result.dop}}</span></li> 
+					<li><span *ngFor='let name of result.authors'>{{name + ", "}}</span></li>
+					<li><i class="glyphicon glyphicon-tags"></i> <span *ngFor='let tag of result.tags'>{{tag + ", "}}</span></li>-->
+				</ul>
+			</div>
+
+			<div class="col-xs-12 col-sm-12 col-md-4 excerpet">
+				<div class="btn btn-default btn-lg btn-square">
+					<i class="fa fa-external-link" aria-hidden="true"></i>
+				</div>
+				<div class="btn btn-default btn-lg btn-square">
+					<i class="fa fa-download" aria-hidden="true"></i>
+				</div>
+			</div>
+			<span class="clearfix borda"></span>
+		</article>
+	</section>
+
+	<ul *ngIf="pager.pages && pager.pages.length" class="pagination">
+		<li [ngClass]="{disabled:pager.currentPage === 1}">
+			<a (click)="pageClicked(1)">First</a>
+		</li>
+		<li [ngClass]="{disabled:pager.currentPage === 1}">
+			<a (click)="pageClicked(pager.currentPage - 1)">Previous</a>
+		</li>
+		<li *ngFor="let page of pager.pages" [ngClass]="{active:pager.currentPage === page}">
+			<a (click)="pageClicked(page)">{{page}}</a>
+		</li>
+		<li [ngClass]="{disabled:pager.currentPage === pager.totalPages}">
+			<a (click)="pageClicked(pager.currentPage + 1)">Next</a>
+		</li>
+		<li [ngClass]="{disabled:pager.currentPage === pager.totalPages}">
+			<a (click)="pageClicked(pager.totalPages)">Last</a>
+		</li>
+	</ul>
+</div>

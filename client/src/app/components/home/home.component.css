@@ -10,12 +10,14 @@
     display:block;
 }
 
-#search_box {
+input {
     margin: 0 auto;
-    float: none;
+    float: left;
     display:block;
 }
 
-#search-main .glyphicon.glyphicon-search {
+.glyphicon.glyphicon-search {
     font-size: 29px;
+    position: relative;
+    float: right;
 }

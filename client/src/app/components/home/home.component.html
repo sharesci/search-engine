@@ -1,0 +1,13 @@
+<div>
+    <div class="image-container">
+        <img src="{{logo}}" width="190" height="230">
+    </div>
+    <div class="form-group col-lg-4 col-lg-offset-4">
+        <input class="form-control input-lg" [(ngModel)]="searchToken" id="search_box" type="text" autofocus>
+    </div>
+    <div id="search-main">
+        <button [routerLink] = "['/searchresult']" (click)="search()" class="btn btn-default" type="submit">
+			<i class="glyphicon glyphicon-search"></i>
+		</button>
+    </div>
+</div>

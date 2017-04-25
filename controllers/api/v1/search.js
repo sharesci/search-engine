@@ -42,11 +42,12 @@ function doSearch(params, resolve, reject) {
 			return;
 		}
 		
-		var cursor = db.collection('papers').find({'$and':[{'$text': {'$search': params.any}}]}, {'_id': 1, 'title': 1, score: {'$meta': 'textScore'}}).sort({'score': {'$meta': 'textScore'}}).skip(params.offset);
+		var cursor = db.collection('papers').find({'$and':[{'$text': {'$search': params.any}}]}, {'_id': 1, 'title': 1, score: {'$meta': 'textScore'}}).sort({'score': {'$meta': 'textScore'}}).skip(parseInt(params.offset));
 		if(params.maxResults) {
 			cursor.limit(params.maxResults);
 		}
 		cursor.toArray((err, arr)=>{
+			console.log(err);
 			if(err){
 				reject(err);
 			} else {

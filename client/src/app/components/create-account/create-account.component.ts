@@ -1,9 +1,9 @@
 import { Component } from '@angular/core';
-import { AccountService } from '../services/account.service.js';
+import { AccountService } from '../../services/account.service.js';
 
 @Component({
     selector: 'ss-account',
-    templateUrl: 'src/app/create-account/create-account.component.html',
+    templateUrl: 'src/app/components/create-account/create-account.component.html',
 })
 
 export class CreateAccountComponent{

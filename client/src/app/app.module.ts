@@ -5,11 +5,11 @@ import { RouterModule } from '@angular/router';
 import { HttpModule } from '@angular/http';
 
 import { AppComponent } from './app.component.js';
-import { LoginComponent } from './login/login.component.js';
-import { NavbarComponent } from './navbar/navbar.component.js'
-import { HomeComponent } from './home/home.component.js'
-import { CreateAccountComponent } from './create-account/create-account.component.js'
-import { SearchResultComponent } from './search-result/search-result.component.js'
+import { LoginComponent } from './components/login/login.component.js';
+import { NavbarComponent } from './components/navbar/navbar.component.js'
+import { HomeComponent } from './components/home/home.component.js'
+import { CreateAccountComponent } from './components/create-account/create-account.component.js'
+import { SearchResultComponent } from './components/search-result/search-result.component.js'
 
 @NgModule({
   imports: [

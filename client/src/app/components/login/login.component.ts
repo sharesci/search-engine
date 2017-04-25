@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
-import { AuthenticationService } from '../services/authentication.service.js';
+import { AuthenticationService } from '../../services/authentication.service.js';
 
 @Component({
     selector: 'ss-login',
-    templateUrl: 'src/app/login/login.component.html',
-    styleUrls: ['src/app/login/login.component.css'],
+    templateUrl: 'src/app/components/login/login.component.html',
+    styleUrls: ['src/app/components/login/login.component.css'],
 })
 
 export class LoginComponent {
