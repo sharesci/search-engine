@@ -1,5 +1,7 @@
 \connect sharesci;
 
+CREATE EXTENSION CITEXT;
+
 CREATE TABLE account (
 	_id         SERIAL NOT NULL,
 	username    TEXT NOT NULL UNIQUE,
@@ -19,7 +21,7 @@ CREATE TABLE email_addr (
 
 	PRIMARY KEY (account_id, email),
 
-	FOREIGN KEY account_id REFERENCES account(_id)
+	FOREIGN KEY (account_id) REFERENCES account(_id)
 		ON UPDATE CASCADE
 		ON DELETE CASCADE
 );
