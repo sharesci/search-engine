@@ -1,15 +1,15 @@
 \connect sharesci;
 
-CREATE EXTENSION CITEXT;
+CREATE EXTENSION IF NOT EXISTS CITEXT;
 
 CREATE TABLE account (
 	_id         SERIAL NOT NULL,
-	username    TEXT NOT NULL UNIQUE,
+	username    CITEXT NOT NULL UNIQUE,
 	passhash    TEXT NOT NULL,
 	self_bio    TEXT,
-	firstname   TEXT NOT NULL,
-	lastname    TEXT NOT NULL,
-	institution TEXT,
+	firstname   CITEXT NOT NULL,
+	lastname    CITEXT NOT NULL,
+	institution CITEXT,
 
 	PRIMARY KEY (_id)
 );
