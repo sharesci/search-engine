@@ -1,6 +1,7 @@
 const
 	pgdb = require('../sharesci-pg-db'),
-	bcrypt = require('bcrypt');
+	bcrypt = require('bcrypt'),
+	validator = require('../util/account_info_validation');
 
 
 function index(req, res) {
@@ -92,27 +93,27 @@ function values_from_request(req, resolve, reject) {
 	}
 
 	// Validate values
-	if (!is_valid_username(values['username'])) {
+	if (!validator.is_valid_username(values['username'])) {
 		reject({errno: 2, errstr: 'Invalid username'});
 		return;
 	}
-	if (!is_valid_password(req.body.password)) {
+	if (!validator.is_valid_password(req.body.password)) {
 		reject({errno: 3, errstr: 'Invalid password'});
 		return;
 	}
-	if (!is_valid_firstname(values['firstname'])) {
+	if (!validator.is_valid_firstname(values['firstname'])) {
 		reject({errno: 6, errstr: 'Invalid firstname'});
 		return;
 	}
-	if (!is_valid_lastname(values['lastname'])) {
+	if (!validator.is_valid_lastname(values['lastname'])) {
 		reject({errno: 6, errstr: 'Invalid lastname'});
 		return;
 	}
-	if (!is_valid_institution(values['institution'])) {
+	if (!validator.is_valid_institution(values['institution'])) {
 		reject({errno: 6, errstr: 'Invalid institution'});
 		return;
 	}
-	if (!is_valid_self_bio(values['self_bio'])) {
+	if (!validator.is_valid_self_bio(values['self_bio'])) {
 		reject({errno: 6, errstr: 'Invalid self-biography'});
 		return;
 	}
@@ -120,44 +121,6 @@ function values_from_request(req, resolve, reject) {
 	resolve(values);
 	
 }
-
-
-function is_valid_username(username) {
-	if (!username) {
-		return false;
-	}
-	return (typeof username === 'string' && 4 <= username.length);
-}
-
-function is_valid_password(password) {
-	if (!password) {
-		return false;
-	}
-	return (typeof password === 'string' && 8 <= password.length);
-}
-
-function is_valid_firstname(firstname) {
-	if (!firstname) {
-		return false;
-	}
-	return (typeof firstname === 'string' && 1 <= firstname.length);
-}
-
-function is_valid_lastname(lastname) {
-	if (!lastname) {
-		return false;
-	}
-	return (typeof lastname === 'string' && 2 <= lastname.length);
-}
-
-function is_valid_self_bio(bio) {
-	return true;
-}
-
-function is_valid_institution(institution) {
-	return true;
-}
-
 
 
 module.exports = {
