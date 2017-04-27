@@ -1,5 +1,7 @@
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthenticationService } from '../../services/authentication.service.js';
+import { SharedService } from '../../services/shared.service.js';
 
 @Component({
     selector: 'ss-login',
@@ -13,7 +15,13 @@ export class LoginComponent {
     password: string;
     errstr: string;
 
-    constructor(private _authenticationService: AuthenticationService) { }
+    constructor(private _authenticationService: AuthenticationService, 
+                private _sharedService: SharedService, 
+                private _router: Router) { 
+                    if(localStorage.getItem("currentUser")){
+                        _router.navigate(["/"]);
+                    }
+                }
 
     login() {
         this._authenticationService.login(this.username, this.password)
@@ -25,11 +33,13 @@ export class LoginComponent {
 
     handleLoginResult(result: any) {
         if (result.errno == '0') {
-            this.errstr = "Succesful"            
             localStorage.setItem('currentUser', this.username);
+            this._sharedService.setLoginStatus(true);
+            this._router.navigate(['/']);
         }
-        else{
-            this.errstr = result.errstr
+        else {
+            this.errstr = result.errstr;
+            this._sharedService.setLoginStatus(false);
         }
     }
 }

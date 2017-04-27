@@ -47,7 +47,6 @@ function doSearch(params, resolve, reject) {
 			cursor.limit(params.maxResults);
 		}
 		cursor.toArray((err, arr)=>{
-			console.log(err);
 			if(err){
 				reject(err);
 			} else {
