@@ -34,7 +34,6 @@ function index(req, res) {
 	});
 }
 
-
 function doSearch(params, resolve, reject) {	
 	MongoClient.connect(mongo_url, function(err, db) {
 		if(err !== null) {
@@ -51,7 +50,6 @@ function doSearch(params, resolve, reject) {
 		if(params.maxResults) {
 			cursor.limit(params.maxResults);
 		}
-		cursor.toArray((err, arr)=>{
 		Promise.all([cursor.toArray(), numHitsPromise])
 		.then((promiseVals)=>{
 			var arr = promiseVals[0];
@@ -66,7 +64,6 @@ function doSearch(params, resolve, reject) {
 		.catch((err)=>{console.error(err);db.close();});
 	});
 }
-
 
 module.exports = {
 	index: index
