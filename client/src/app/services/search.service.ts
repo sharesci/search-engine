@@ -11,11 +11,11 @@ export class SearchService {
 
     private _searchUrl = this._config.apiUrl + '/api/v1/search?';
 
-    search(searchToken: string, offset = 0, maxResult = "10"): Observable<any> {
+    search(searchToken: string, offset = 0, maxResult = 10): Observable<any> {
         let queryString = new URLSearchParams();
         queryString.append('any', searchToken);
         queryString.append('offset', offset.toString());
-        queryString.append('maxResults', maxResult);        
+        queryString.append('maxResults', maxResult.toString());        
 
         return this._http.get(this._searchUrl + queryString.toString())
             .map((response: Response) => response.json());

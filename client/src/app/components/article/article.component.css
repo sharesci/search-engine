@@ -1,0 +1,13 @@
+#article-container {
+    margin-top: 70px;
+    margin-left: 10%; 
+}
+
+ dd, dt {
+    margin-bottom: 10px;
+ }
+
+ .panel {
+     width: 65%;
+     border: 0;
+ }

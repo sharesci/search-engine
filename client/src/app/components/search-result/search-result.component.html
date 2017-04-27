@@ -1,13 +1,13 @@
 <div class="container search-container">
 	<div class="mb20">
 		<h1>Search Results</h1>
-		<h2 class="lead"><strong class="text-danger">{{search_results.length}}</strong> results were found for the search for <strong class="text-danger">Neural Networks</strong></h2>
+		<h2 class="lead"><strong class="text-danger">{{search_results?.numResults}}</strong> results were found for the search for <strong class="text-danger">{{search_token}}</strong></h2>
 	</div>
 
-	<section class="col-xs-12 col-sm-6 col-md-12" *ngFor='let result of search_results'>
+	<section class="col-xs-12 col-sm-6 col-md-12" *ngFor='let result of search_results?.results'>
 		<article class="search-result row">
 			<div class="col-xs-12 col-sm-12 col-md-8">
-				<h3><a href="#" title="">{{result.title}}</a></h3>
+				<h3><a [routerLink]="['/article', result._id]" title="">{{result.title}}</a></h3>
 				<ul class="meta-search list-inline">
 					<!--<li><span>{{result.dop}}</span></li> 
 					<li><span *ngFor='let name of result.authors'>{{name + ", "}}</span></li>
