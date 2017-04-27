@@ -16,14 +16,18 @@ export class NavbarComponent {
     ishome: boolean = false;
     hideLoginBtn: boolean = false;
     searchToken: string = '';
+    user: string = '';
 
-    constructor(private _authenticationService: AuthenticationService, 
+    constructor(private _authenticationService : AuthenticationService,
                 private _router: Router,
                 private _searchService: SearchService, 
                 private _sharedService: SharedService) { 
-        _authenticationService.isUserLoggedIn$
-            .subscribe(
-                isUserLoggedIn => { this.hideLoginBtn = isUserLoggedIn }
+        _sharedService.isUserLoggedIn$
+            .subscribe(                
+                isUserLoggedIn => { 
+                    this.hideLoginBtn = isUserLoggedIn;
+                    this.user = localStorage.getItem("currentUser") || "";
+                 }
         );
             
         _router.events
@@ -31,6 +35,9 @@ export class NavbarComponent {
             .subscribe((event:NavigationStart) => {
                 this.toggleSearchBox(event.url);
         });
+        
+        this.user = localStorage.getItem("currentUser") || "";
+        this.hideLoginBtn = !!this.user;
     }
 
     toggleSearchBox(currenturl: string){
@@ -42,10 +49,21 @@ export class NavbarComponent {
         }
     }
 
+    toggleLoginBtn() {
+        if(this.user) {
+            this.hideLoginBtn = true;
+        }
+        else {
+            this.user = "";
+            this.hideLoginBtn = false;
+        }
+    }
+
     logout() {
         this._authenticationService.logout()
             .subscribe(null, null, () => {
                 localStorage.removeItem('currentUser');
+                this._sharedService.setLoginStatus(false);
         })
     }
 

@@ -10,8 +10,11 @@ export class SharedService {
 
     private searchResultsSource = new Subject<ISearchResults>();
     private searchTermSource = new Subject<string>();
+    private isUserLoggedInSource = new Subject<boolean>();
+
     searchResult$ = this.searchResultsSource.asObservable();
     searchterm$ = this.searchTermSource.asObservable();
+    isUserLoggedIn$ = this.isUserLoggedInSource.asObservable();
 
     addSearchResults(searchResults: ISearchResults) {
         this.searchResultsSource.next(searchResults)
@@ -19,5 +22,9 @@ export class SharedService {
 
     addSearchTerm(searchTerm: string) {
         this.searchTermSource.next(searchTerm);
+    }
+
+    setLoginStatus(isUserLoggedIn: boolean) {
+        this.isUserLoggedInSource.next(isUserLoggedIn);
     }
 }

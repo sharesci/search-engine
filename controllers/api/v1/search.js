@@ -34,7 +34,6 @@ function index(req, res) {
 	});
 }
 
-
 function doSearch(params, resolve, reject) {	
 	MongoClient.connect(mongo_url, function(err, db) {
 		if(err !== null) {
@@ -65,7 +64,6 @@ function doSearch(params, resolve, reject) {
 		.catch((err)=>{console.error(err);db.close();});
 	});
 }
-
 
 module.exports = {
 	index: index

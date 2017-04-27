@@ -12,8 +12,6 @@ export class AuthenticationService {
 
     private _loginUrl = this._config.apiUrl + '/login';
     private _logoutUrl = this._config.apiUrl + '/logout';
-    private isUserLoggedInSource = new Subject<boolean>();
-    isUserLoggedIn$ = this.isUserLoggedInSource.asObservable();
 
     login(username: string, password: string): Observable<any> {
         let data = new URLSearchParams();
@@ -21,15 +19,13 @@ export class AuthenticationService {
         data.append('password', password);
 
         return this._http.post(this._loginUrl, data)
-            .map((response: Response) => {
-                this.isUserLoggedInSource.next(true); 
+            .map((response: Response) => {                
                 return response.json();
             });
     }
 
-    logout() {
+    logout(): Observable<Response> {
         let observ = this._http.post(this._logoutUrl, {});
-        observ.subscribe(null, null, () => { this.isUserLoggedInSource.next(false)});
         return observ;
     }
 }
