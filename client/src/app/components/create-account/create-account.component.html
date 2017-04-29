@@ -5,45 +5,74 @@
         <legend class="text-center">Register on ShareSci</legend>
         <fieldset>
           <legend>Account Details</legend>
-          <div class="form-group col-md-7">
-            <label for="first_name">UserName</label>
-            <input type="text" class="form-control" name="username" id="username" placeholder="User Name" [(ngModel)]="username">
+          <div class="form-group">
+            <div class="row">
+              <div class="col-md-6">
+                <label for="first_name">UserName</label>
+                <input type="text" class="form-control" name="username" id="username" placeholder="User Name" [(ngModel)]="user.username">
+              </div>
+            </div>
           </div>
-          <div class="form-group col-md-6">
-            <label for="first_name">First name</label>
-            <input type="text" class="form-control" name="first_name" id="first_name" placeholder="First Name">
+          <div class="form-group">
+            <div class="row">
+              <div class="col-md-6">
+                <label for="first_name">First name</label>
+                <input type="text" class="form-control" name="first_name" id="first_name" placeholder="First Name" [(ngModel)]="user.firstname">
+              </div>
+              <div class="col-md-6">
+                <label for="last_name">Last name</label>
+                <input type="text" class="form-control" name="last_name" id="last_name" placeholder="Last Name" [(ngModel)]="user.lastname">
+              </div>
+            </div>
           </div>
-          <div class="form-group col-md-6">
-            <label for="last_name">Last name</label>
-            <input type="text" class="form-control" name="last_name" id="last_name" placeholder="Last Name">
+          <div class="form-group">
+            <div class="row">
+              <div class="col-md-6">
+                <label for="">Email</label>
+                <input type="email" class="form-control" name="email" id="email" placeholder="Email">
+              </div>
+              <div class="col-md-6">
+                <label for="">Confirm Email</label>
+                <input type="email" class="form-control" name="email" id="conf_email" placeholder="Enter Email Again">
+              </div>
+            </div>
           </div>
-          <div class="form-group col-md-6">
-            <label for="">Email</label>
-            <input type="email" class="form-control" name="email" id="email" placeholder="Email">
-          </div>
-          <div class="form-group col-md-6">
-            <label for="">Confirm Email</label>
-            <input type="email" class="form-control" name="email" id="conf_email" placeholder="Enter Email Again">
-          </div>
-          <div class="form-group col-md-6">
-            <label for="password">Password</label>
-            <input type="password" class="form-control" name="password" id="password" placeholder="Password" [(ngModel)]="password">
-          </div>
-          <div class="form-group col-md-6">
-            <label for="confirm_password">Confirm Password</label>
-            <input type="password" class="form-control" name="" id="confirm_password" placeholder="Confirm Password">
+          <div class="form-group">
+            <div class="row">
+              <div class="col-md-6">
+                <label for="password">Password</label>
+                <input type="password" class="form-control" name="password" id="password" placeholder="Password" [(ngModel)]="user.password">
+              </div>
+              <div class="col-md-6">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" class="form-control" name="" id="confirm_password" placeholder="Confirm Password">
+              </div>
+            </div>
           </div>
         </fieldset>
         <fieldset>
           <legend>Optional Details</legend>
 
-          <div class="form-group col-md-6">
-            <label for="country">Institution</label>
-            <select class="form-control" name="" id="country">
-                <option>Country 1</option>
-                <option>Country 2</option>
-                <option>Country 3</option>
-            </select>
+          <div class="form-group">
+            <div class="row">
+              <div class="col-md-6">
+                <label for="institution">Institution</label>
+                <select class="form-control" name="institution" id="institution" [(ngModel)]="user.institution">
+                  <option>Cleveland State University</option>
+                  <option>Ohio State University</option>
+                  <option>Case Western Reserve University</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="row">
+              <div class="col-md-6">
+                <label for="bio"><strong>Bio</strong></label>
+                <textarea class="form-control" name="self_bio" rows="5" id="bio" [(ngModel)]="user.self_bio"></textarea>
+              </div>
+            </div>
           </div>
 
           <div class="form-group col-md-12 hidden">
@@ -56,7 +85,7 @@
           <div class="col-md-12">
             <button type="submit" class="btn btn-primary" (click)="createAccount()">Register</button>
             <a [routerLink]="['/login']" href="#">Already have an account?</a>
-            <label>{{errstr}}</label>
+            <label style="color: red"><strong><h3>{{errstr}}</h3></strong></label>
           </div>
         </div>
       </form>

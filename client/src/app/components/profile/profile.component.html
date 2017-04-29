@@ -1,6 +1,6 @@
 <div id="profile-container" class="container bootstrap snippet">
     <div class="row">
-        
+
         <div class="col-sm-3">
             <div class="panel panel-default">
                 <div class="panel-heading">
@@ -29,26 +29,34 @@
                     <div class="row">
                         <div class="form-group">
                             <div class="col-xs-6">
-                                <label for="password"><h5><strong>Password</strong></h5></label>
-                                <input type="password" class="form-control" name="password" id="password" title="enter your password.">
+                                <label for="password"><h5><strong>Old Password</strong></h5></label>
+                                <input type="password" class="form-control" name="old_password" id="old_password" title="enter your old password.">
                             </div>
                         </div>
                     </div>
                     <div class="form-group">
                         <div class="row">
                             <div class="col-xs-6">
-                                <label for="password2"><h5><strong>Verify</strong></h5></label>
-                                <input type="password" class="form-control" name="password2" id="password2" title="enter your password2.">
+                                <label for="password"><h5><strong>New Password</strong></h5></label>
+                                <input type="password" class="form-control" name="password" id="password" title="enter new password.">
                             </div>
                         </div>
                     </div>
                     <div class="form-group">
-                            <div class="col-xs-12">
-                                <br>
-                                <button class="btn btn-lg btn-primary" type="submit"><i class="glyphicon glyphicon-ok-sign"></i> Save</button>
-                                <button class="btn btn-lg" type="reset"><i class="glyphicon glyphicon-repeat"></i> Reset</button>
+                        <div class="row">
+                            <div class="col-xs-6">
+                                <label for="password2"><h5><strong>Confirm New Password</strong></h5></label>
+                                <input type="password" class="form-control" name="password2" id="password2" title="verify new password.">
                             </div>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-xs-12">
+                            <br>
+                            <button class="btn btn-lg btn-primary" type="submit"><i class="glyphicon glyphicon-ok-sign"></i> Save</button>
+                            <button class="btn btn-lg" type="reset"><i class="glyphicon glyphicon-repeat"></i> Reset</button>
+                        </div>
+                    </div>
 
                 </div>
 
@@ -58,15 +66,7 @@
                             <div class="row">
                                 <div class="col-xs-6">
                                     <label for="first_name"><h5><strong>First Name</strong></h5></label>
-                                    <input type="text" class="form-control" name="first_name" id="first_name" title="enter your first name if any.">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <div class="row">
-                                <div class="col-xs-6">
-                                    <label for="middle_name"><h5><strong>M. I.</strong></h5></label>
-                                    <input type="text" class="form-control" name="middle_name" id="middle_name" title="enter your middle name if any.">
+                                    <input type="text" class="form-control" name="first_name" id="first_name" title="enter your first name if any." [(ngModel)]="user.firstname">
                                 </div>
                             </div>
                         </div>
@@ -74,15 +74,19 @@
                             <div class="row">
                                 <div class="col-xs-6">
                                     <label for="last_name"><h5><strong>Last Name</strong></h5></label>
-                                    <input type="text" class="form-control" name="last_name" id="last_name" title="enter your last name if any.">
+                                    <input type="text" class="form-control" name="last_name" id="last_name" title="enter your last name if any." [(ngModel)]="user.lastname">
                                 </div>
                             </div>
                         </div>
                         <div class="form-group">
                             <div class="row">
-                                <div class="col-xs-6">
-                                    <label for="mobile"><h5><strong>Mobile</strong></h5></label>
-                                    <input type="text" class="form-control" name="mobile" id="mobile" title="enter your mobile number if any.">
+                                <div class="col-md-6">
+                                    <label for="institution">Institution</label>
+                                    <select class="form-control" name="institution" id="institution" [(ngModel)]="user.institution">
+                                        <option>Cleveland State University</option>
+                                        <option>Ohio State University</option>
+                                        <option>Case Western Reserve University</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -90,7 +94,7 @@
                             <div class="row">
                                 <div class="col-xs-6">
                                     <label for="bio"><strong>Bio</strong></label>
-                                    <textarea class="form-control" rows="5" id="bio"></textarea>
+                                    <textarea class="form-control" rows="5" id="bio" name="self_bio" [(ngModel)]="user.self_bio"></textarea>
                                 </div>
                             </div>
                         </div>

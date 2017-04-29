@@ -68,7 +68,6 @@ export class NavbarComponent {
     }
 
     search() {
-        console.log("Hey");
         this._searchService.search(this.searchToken)
             .map(response => <ISearchResults>response)
             .subscribe( 
@@ -77,5 +76,4 @@ export class NavbarComponent {
                 error => console.log(error)
             );
     }
-   
 }

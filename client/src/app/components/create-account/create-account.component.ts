@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { User } from '../../entities/user.entity.js';
 import { AccountService } from '../../services/account.service.js';
 
 @Component({
@@ -7,14 +8,13 @@ import { AccountService } from '../../services/account.service.js';
 })
 
 export class CreateAccountComponent{
-    username: string;
-    password: string;
+    user = new User();
     errstr: string;
 
     constructor(private _accountService: AccountService) { }
 
     createAccount() {
-        this._accountService.create(this.username, this.password)
+        this._accountService.create(this.user)
             .subscribe(
                 result => this.handleResult(result),
                 error => console.log(error)
