@@ -5,6 +5,7 @@ const
 	articleController = require('../../../controllers/api/v1/article'),
 	userinfoController = require('../../../controllers/api/v1/userinfo');
 	useremailController = require('../../../controllers/api/v1/useremail');
+	userpasswordController = require('../../../controllers/api/v1/userpassword');
 
 var router = express.Router();
 
@@ -18,6 +19,9 @@ router.post('/userinfo', userinfoController.putUserInfo);
 
 router.post('/useremail', bodyParser.urlencoded({ extended: true }));
 router.post('/useremail', useremailController.putUserEmail);
+
+router.post('/userpassword', bodyParser.urlencoded({ extended: true }));
+router.post('/userpassword', userpasswordController.putUserPassword);
 
 router.delete('/useremail', bodyParser.urlencoded({ extended: true }));
 router.delete('/useremail', useremailController.deleteUserEmail);
