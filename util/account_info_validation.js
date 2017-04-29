@@ -1,4 +1,12 @@
 
+function is_valid_email(email) {
+	if (!email) {
+		return false;
+	}
+	return (typeof email === 'string' && (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i).test(email));
+}
+
+
 function is_valid_username(username) {
 	if (!username) {
 		return false;
@@ -37,6 +45,7 @@ function is_valid_institution(institution) {
 
 
 module.exports = {
+	is_valid_email:       is_valid_email,
 	is_valid_username:    is_valid_username,
 	is_valid_password:    is_valid_password,
 	is_valid_firstname:   is_valid_firstname,
