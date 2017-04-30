@@ -46,7 +46,7 @@ export class ProfileComponent implements OnInit {
     saveUserInfo() {
         this._accountService.updateUserInfo(this.user)
             .subscribe(
-                results => { },
+                results => { this.err.profile = "Successfully updated."},
                 error => { this.err.profile = error }
             )
     }
@@ -70,14 +70,14 @@ export class ProfileComponent implements OnInit {
         if(this.emails[index]) {
             this._accountService.deleteUserEmail(this.user.username, this.emails[index])
                 .subscribe(
-                result => { } ,
-                error => { this.err.account = error; return }
+                    result => { } ,
+                    error => { this.err.account = error; return }
                 )
         }
         this._accountService.addUserEmail(this.user.username, this.emailsupdated[index])
             .subscribe(
-            result => { this.err.account = "Success updated"; this.emails = this.emailsupdated },
-            error => this.err.account = error
+                result => { this.err.account = "Success updated"; this.emails = this.emailsupdated },
+                error => this.err.account = error
             )
     }
 
