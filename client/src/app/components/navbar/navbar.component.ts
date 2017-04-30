@@ -21,14 +21,10 @@ export class NavbarComponent {
     constructor(private _authenticationService : AuthenticationService,
                 private _router: Router,
                 private _searchService: SearchService, 
-                private _sharedService: SharedService) { 
+                private _sharedService: SharedService) {
+
         _sharedService.isUserLoggedIn$
-            .subscribe(                
-                isUserLoggedIn => { 
-                    this.hideLoginBtn = isUserLoggedIn;
-                    this.user = localStorage.getItem("currentUser") || "";
-                 }
-        );
+            .subscribe(isUserLoggedIn => this.setUser(isUserLoggedIn));
             
         _router.events
             .filter(event => event instanceof NavigationStart)
@@ -38,6 +34,11 @@ export class NavbarComponent {
         
         this.user = localStorage.getItem("currentUser") || "";
         this.hideLoginBtn = !!this.user;
+    }
+
+    setUser(isUserLoggedIn: boolean) {
+        this.hideLoginBtn = isUserLoggedIn;
+        this.user = localStorage.getItem("currentUser") || "";
     }
 
     toggleSearchBox(currenturl: string){

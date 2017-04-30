@@ -15,7 +15,7 @@ export class LoginComponent {
     password: string;
     errstr: string;
 
-    constructor(private _authenticationService: AuthenticationService, 
+    constructor(private _authService: AuthenticationService, 
                 private _sharedService: SharedService, 
                 private _router: Router) { 
                     if(localStorage.getItem("currentUser")){
@@ -24,7 +24,7 @@ export class LoginComponent {
                 }
 
     login() {
-        this._authenticationService.login(this.username, this.password)
+        this._authService.login(this.username, this.password)
             .subscribe(
                 result => this.handleLoginResult(result),
                 error => console.log(error)
@@ -32,6 +32,7 @@ export class LoginComponent {
     }
 
     handleLoginResult(result: any) {
+        console.log(result);
         if (result.errno == '0') {
             localStorage.setItem('currentUser', this.username);
             this._sharedService.setLoginStatus(true);
