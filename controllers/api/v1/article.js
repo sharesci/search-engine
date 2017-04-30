@@ -89,7 +89,7 @@ function getArticle(req, res) {
 function putArticle(req, res) {
 	var responseJson = {
 		errno: 0,
-		articleJson: null
+		errstr: ''
 	};
 
 	var metaJson = req.body.metaJson;
@@ -135,12 +135,7 @@ function putArticle(req, res) {
 			res.status(500).json({errno: 1, errstr: 'Error opening DB'}).end();
 			return;
 		}
-		var queryJson = {};
-		if(metaJson['_id']) {
-			queryJson = {'_id': metaJson['_id']};
-		}
-		var cursor = db.collection('papers').update(queryJson, metaJson, {upsert:true},
-			(err, count, data)=>{
+		var handlerFunc = (err, data)=>{
 				if(err){
 					res.writeHead(500);
 					responseJson.errno = 1;	
@@ -148,11 +143,18 @@ function putArticle(req, res) {
 					responseJson.errno = 0;
 					responseJson.errstr = '';
 				}
+				if(data['insertedIds']) {
+					responseJson.insertedIds = data.insertedIds;
+				}
 				db.close();
 				res.json(responseJson);
 				res.end();
-			}
-		);
+			};
+		if(metaJson['_id']) {
+			var cursor = db.collection('papers').update(queryJson, metaJson, handlerFunc);
+		} else {
+			var cursor = db.collection('papers').insert(metaJson, handlerFunc);
+		}
 	});
 }
 
