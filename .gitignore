@@ -38,3 +38,6 @@ jspm_packages
 
 # Vim SWP files
 *.swp
+
+# Upload directory
+/uploads/*
