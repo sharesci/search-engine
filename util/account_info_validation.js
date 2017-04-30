@@ -1,4 +1,20 @@
 
+function is_valid_articleMetaJson(articleMetaJson) {
+	if(!articleMetaJson) {
+		return false;
+	}
+	try {
+		var a = JSON.parse(articleMetaJson);
+		if(!a || typeof a !== 'object') {
+			return false;
+		}
+	}
+	catch(err) {
+		return false;
+	}
+	return true;
+}
+
 function is_valid_email(email) {
 	if (!email) {
 		return false;
@@ -45,12 +61,13 @@ function is_valid_institution(institution) {
 
 
 module.exports = {
-	is_valid_email:       is_valid_email,
-	is_valid_username:    is_valid_username,
-	is_valid_password:    is_valid_password,
-	is_valid_firstname:   is_valid_firstname,
-	is_valid_lastname:    is_valid_lastname,
-	is_valid_self_bio:    is_valid_self_bio,
-	is_valid_institution: is_valid_institution
+	is_valid_articleMetaJson:       is_valid_articleMetaJson,
+	is_valid_email:                 is_valid_email,
+	is_valid_username:              is_valid_username,
+	is_valid_password:              is_valid_password,
+	is_valid_firstname:             is_valid_firstname,
+	is_valid_lastname:              is_valid_lastname,
+	is_valid_self_bio:              is_valid_self_bio,
+	is_valid_institution:           is_valid_institution
 };
 
