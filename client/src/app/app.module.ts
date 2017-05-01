@@ -19,7 +19,7 @@ const appRoutes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'home', component: HomeComponent },
   { path: 'createaccount', component: CreateAccountComponent },
-  { path: 'searchresult', component: SearchResultComponent },
+  { path: 'searchresult/:term', component: SearchResultComponent },
   { path: 'profile/:username', component: ProfileComponent },
   { path: 'article/:id', component: ArticleComponent },
   { path: 'article/upload/:username', component: ArticleUploadComponent },

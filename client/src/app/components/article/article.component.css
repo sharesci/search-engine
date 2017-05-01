@@ -11,3 +11,7 @@
      width: 65%;
      border: 0;
  }
+
+ .list-group-item {
+     cursor: pointer
+ }

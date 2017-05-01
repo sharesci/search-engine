@@ -67,14 +67,4 @@ export class NavbarComponent {
                 this._sharedService.setLoginStatus(false);
         })
     }
-
-    search() {
-        this._searchService.search(this.searchToken)
-            .map(response => <ISearchResults>response)
-            .subscribe( 
-                results => { this._sharedService.addSearchResults(results); 
-                             this._sharedService.addSearchTerm(this.searchToken) },
-                error => console.log(error)
-            );
-    }
 }

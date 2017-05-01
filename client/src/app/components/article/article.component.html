@@ -17,11 +17,11 @@
     <div class="col-xs-2">
         <div class="panel panel-default">
             <ul class="list-group">		
-                <a class="list-group-item text-center">
+                <a class="list-group-item text-center" (click)="viewPdf(false)">
                     <span><i class="fa fa-external-link" aria-hidden="true"></i></span>
                     <span><strong>View</strong></span>
                 </a>
-                <a class="list-group-item text-center">
+                <a class="list-group-item text-center" (click)="viewPdf(true)">
                     <span><i class="fa fa-download" aria-hidden="true"></i></span>
                     <span><strong>Download</strong></span>
                 </a>
