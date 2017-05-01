@@ -1515,6 +1515,11 @@
       "from": "negotiator@0.6.1",
       "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.1.tgz"
     },
+    "ng2-file-upload": {
+      "version": "1.2.1",
+      "from": "ng2-file-upload@latest",
+      "resolved": "https://registry.npmjs.org/ng2-file-upload/-/ng2-file-upload-1.2.1.tgz"
+    },
     "node-uuid": {
       "version": "1.4.8",
       "from": "node-uuid@>=1.4.7 <1.5.0",

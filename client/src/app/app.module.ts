@@ -3,6 +3,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
 import { HttpModule } from '@angular/http';
+import { FileSelectDirective, FileDropDirective } from 'ng2-file-upload';
 
 import { AppComponent } from './app.component.js';
 import { LoginComponent } from './components/login/login.component.js';
@@ -12,6 +13,7 @@ import { CreateAccountComponent } from './components/create-account/create-accou
 import { SearchResultComponent } from './components/search-result/search-result.component.js'
 import { ProfileComponent } from './components/profile/profile.component.js'
 import { ArticleComponent } from './components/article/article.component.js'
+import { ArticleUploadComponent } from './components/article-upload/article-upload.component.js'
 
 const appRoutes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -20,6 +22,7 @@ const appRoutes: Routes = [
   { path: 'searchresult', component: SearchResultComponent },
   { path: 'profile/:username', component: ProfileComponent },
   { path: 'article/:id', component: ArticleComponent },
+  { path: 'article/upload/:username', component: ArticleUploadComponent },
   { path: '', redirectTo: 'home', pathMatch: 'full' },
   { path: '**', redirectTo: 'home', pathMatch: 'full' }
 ];
@@ -33,7 +36,8 @@ const appRoutes: Routes = [
   ],
   declarations: [ AppComponent, LoginComponent, NavbarComponent, HomeComponent,
                   CreateAccountComponent, SearchResultComponent, ProfileComponent,
-                  ArticleComponent ],
+                  ArticleComponent, ArticleUploadComponent,
+                  FileSelectDirective, FileDropDirective ],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

@@ -24,8 +24,8 @@ export class ProfileComponent implements OnInit {
         this._accountService.getUserInfo(this._route.snapshot.params['username'])
             .map(response => <IUserWrapper>response)
             .subscribe(
-            data => this.showUserInfo(data),
-            error => console.log(error)
+                data => this.showUserInfo(data),
+                error => console.log(error)
             )
 
         this._accountService.getUserEmail(this._route.snapshot.params['username'])
