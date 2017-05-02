@@ -18,9 +18,19 @@ export class SearchResultComponent implements OnInit {
     pager: any = {};
     resultPerPage: number = 10;
 
-    constructor( private _pagerService: PagerService,
+    constructor(private _pagerService: PagerService,
         private _searchService: SearchService, private _articleService: ArticleService,
-        private _route: ActivatedRoute) { }
+        private _route: ActivatedRoute) {
+        _route.params.subscribe(params => {
+            this.search_token = this._route.snapshot.params['term'];
+            this._searchService.search(this.search_token)
+                .map(response => <ISearchResults>response)
+                .subscribe(
+                results => { this.showResults(results); },
+                error => console.log(error)
+                );
+        });
+    }
 
     ngOnInit() {
         this.search_token = this._route.snapshot.params['term'];
