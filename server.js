@@ -25,6 +25,12 @@ try {
 	}
 }
 
+app.use('/', (req, res, next) => {
+	if(!req.secure) {
+		return res.redirect(['https://', req.get('Host'), req.url].join(''));
+	}
+	next();
+});
 app.use(express_session({
 	secret: require('crypto').randomBytes(64).toString('base64'),
 	resave: false,
@@ -32,13 +38,13 @@ app.use(express_session({
 	httpOnly: true,
 	secure: true,
 	ephemeral: true,
-	cookie: { maxAge: 60*1000 }
+	cookie: { maxAge: 16*60*60*1000 }
 }));
 app.use('/', rootRouter);
 app.use('/', express.static(__dirname + '/client'));
 
-http.createServer(app).listen(7080);
+http.createServer(app).listen(80);
 
 if (https_ok) {
-	https.createServer(https_options, app).listen(7443);
+	https.createServer(https_options, app).listen(443);
 }
