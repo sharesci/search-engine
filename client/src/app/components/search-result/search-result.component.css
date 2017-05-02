@@ -3,6 +3,12 @@
     margin-top: 50px; 
 }
 
+ul.pagination {
+	user-select: none;
+	-moz-user-select: none;
+	-webkit-user-select: none;
+}
+
 .mb20 { 
     margin-bottom: 20px;
 } 
