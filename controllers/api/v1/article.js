@@ -1,5 +1,6 @@
 const
 	express = require('express'),
+	pdftotext = require('pdftotextjs'),
 	assert = require('assert'),
 	ObjectId = require('mongodb').ObjectId,
 	MongoClient = require('mongodb').MongoClient,
@@ -146,16 +147,45 @@ function putArticle(req, res) {
 				if(data['insertedIds']) {
 					responseJson.insertedIds = data.insertedIds;
 				}
-				db.close();
 				res.json(responseJson);
 				res.end();
+				if(req.files.length > 0) {
+					var fullTextPromise = parseFullText(__dirname + '/../../../uploads/' + req.files[0].filename);
+					fullTextPromise.then((text) => {
+						db.collection('papers').update({'_id': metaJson['_id']}, {"$set": {fulltext_text: text}}, (err, data) => {
+							if(err) {
+								console.error(error);
+							}
+							db.close();
+						});
+					})
+					.catch((err) => {
+						console.error(err);
+						db.close();
+					});
+				} else {
+					db.close();
+				}
 			};
 		if(metaJson['_id']) {
-			var cursor = db.collection('papers').update(queryJson, metaJson, handlerFunc);
+			var cursor = db.collection('papers').update(queryJson, {'$set': metaJson}, handlerFunc);
 		} else {
 			var cursor = db.collection('papers').insert(metaJson, handlerFunc);
 		}
 	});
+}
+
+function parseFullText(paperfile) {
+return new Promise((resolve, reject) => {
+	pdf = new pdftotext(paperfile);
+	pdf.getText((err, data, cmd) => {
+		if(err) {
+			reject(err);
+			return;
+		}
+		resolve(data);
+	});
+});
 }
 
 
