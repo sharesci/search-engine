@@ -26,8 +26,8 @@ export class SearchResultComponent implements OnInit {
             this._searchService.search(this.search_token)
                 .map(response => <ISearchResults>response)
                 .subscribe(
-                results => { this.showResults(results); },
-                error => console.log(error)
+                    results => { this.showResults(results); this.setPage(1) },
+                    error => console.log(error)
                 );
         });
     }
@@ -37,14 +37,13 @@ export class SearchResultComponent implements OnInit {
         this._searchService.search(this.search_token)
             .map (response => <ISearchResults>response)
             .subscribe (
-                results => { this.showResults(results);},
+                results => { this.showResults(results); this.setPage(1);},
                 error => console.log(error)
             );
     }
 
     private showResults(search_results: ISearchResults) {
         this.search_results = search_results;
-        this.setPage(1);
     }
 
     private pageClicked(page: number) {
