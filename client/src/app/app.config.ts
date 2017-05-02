@@ -8,7 +8,7 @@ import { DOCUMENT } from '@angular/platform-browser';
 export class AppConfig {
     constructor(@Inject(DOCUMENT) private document: any) { 
         this.apiPort = 7080;
-        this.apiUrl = 'http://' + this.document.location.hostname + ':' + this.apiPort;
+        this.apiUrl = this.document.location.origin;
     }
 
     public readonly apiUrl : string;
