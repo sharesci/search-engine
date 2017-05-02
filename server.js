@@ -43,7 +43,7 @@ app.use(express_session({
 app.use('/', rootRouter);
 app.use('/', express.static(__dirname + '/client'));
 
-http.createServer(app).listen(7080);
+http.createServer(app).listen(80);
 
 if (https_ok) {
 	https.createServer(https_options, app).listen(443);
