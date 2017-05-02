@@ -12,8 +12,8 @@ var https_ok = true;
 var https_options = {};
 try {
 	var https_options = {
-		key: fs.readFileSync('../certs/site_key.pem'),
-		cert: fs.readFileSync('../certs/site_cert.pem')
+		key: fs.readFileSync('/etc/letsencrypt/live/sharesci.org/privkey.pem'),
+		cert: fs.readFileSync('/etc/letsencrypt/live/sharesci.org/cert.pem')
 	};
 } catch (err) {
 	https_ok = false;
