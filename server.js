@@ -26,7 +26,7 @@ try {
 }
 
 app.use('/', (req, res, next) => {
-	if(!req.secure) {
+	if(!req.secure && https_ok) {
 		return res.redirect(['https://', req.get('Host'), req.url].join(''));
 	}
 	next();
