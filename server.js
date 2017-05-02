@@ -32,7 +32,7 @@ app.use(express_session({
 	httpOnly: true,
 	secure: true,
 	ephemeral: true,
-	cookie: { maxAge: 60*1000 }
+	cookie: { maxAge: 16*60*60*1000 }
 }));
 app.use('/', rootRouter);
 app.use('/', express.static(__dirname + '/client'));
