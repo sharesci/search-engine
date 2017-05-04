@@ -11,6 +11,10 @@
             <dd>{{article?.doi}}</dd>
             <dt>Citation</dt>
             <dd *ngIf='article'>{{article["journal-ref"]}}</dd>
+            <dt>Authors</dt>
+            <dd *ngFor="let author of article?.authors">{{author?.forenames + ' ' + author?.keyname}}</dd>
+            <dt>References</dt>
+            <dd *ngFor="let reference of article?.references">{{reference}}</dd>
         </dl>
     </div>
 
