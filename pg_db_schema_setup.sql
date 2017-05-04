@@ -2,7 +2,7 @@
 
 CREATE EXTENSION IF NOT EXISTS CITEXT;
 
-CREATE TABLE account (
+CREATE TABLE IF NOT EXISTS account (
 	_id         SERIAL NOT NULL,
 	username    CITEXT NOT NULL UNIQUE,
 	passhash    TEXT NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE account (
 	PRIMARY KEY (_id)
 );
 
-CREATE TABLE email_addr (
+CREATE TABLE IF NOT EXISTS email_addr (
 	account_id  INTEGER NOT NULL,
 	email       CITEXT NOT NULL,
 	isPrimary   BOOLEAN NOT NULL DEFAULT FALSE,
