@@ -21,7 +21,7 @@ function getUserEmail(req, res) {
 		return;
 	}
 
-	pgdb.any('SELECT email FROM email_addr e INNER JOIN account a ON e.account_id = a._id WHERE a.username = ${username};', {'username': username})
+	pgdb.func('get_user_email_addr', [username])
 	.then((data) => {
 		responseJson.emails = [];
 		for(emailJson of data) {
@@ -65,21 +65,15 @@ function putUserEmail(req, res) {
 	}
 
 	var values = {
-		'username': username,
-		'email': req.body['email'],
-		'isprimary': (typeof req.body['isprimary'] === 'boolean' && req.body['isprimary'])
+		'_in_username': username,
+		'_in_email': req.body['email'],
+		'_in_isprimary': (typeof req.body['isprimary'] === 'boolean' && req.body['isprimary'])
 	};
-	if(!validator.is_valid_email(values['email'])) {
+	if(!validator.is_valid_email(values['_in_email'])) {
 		respond_error({errno: 6, errstr: 'Invalid email'});
 		return;
 	}
-
-	var queryStr = 'INSERT INTO email_addr (account_id, email, isprimary) ' +
-		' SELECT account._id, ${email}, ${isprimary} ' +
-		' FROM account ' +
-		' WHERE username = ${username};';
-
-	pgdb.none(queryStr, values)
+	pgdb.proc('put_user_email_addr', [values['_in_username'], values['_in_email'], values['_in_isprimary']])
 	.then((data) => {
 		res.json(responseJson);
 		res.end();
@@ -115,15 +109,15 @@ function deleteUserEmail(req, res) {
 	}
 
 	var values = {
-		'username': username,
-		'email': req.body['email']
+		'_in_username': username,
+		'_in_email': req.body['email']
 	};
 
 	var queryStr = 'DELETE FROM email_addr ' +
 		' WHERE account_id = (SELECT _id FROM account WHERE username = ${username}) ' +
 		' AND email = ${email};';
 
-	pgdb.none(queryStr, values)
+	pgdb.proc('del_user_email_addr', [values['_in_username'], values['_in_email']])
 	.then((data) => {
 		res.json(responseJson);
 		res.end();

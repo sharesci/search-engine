@@ -39,13 +39,7 @@ function putUserPassword(req, res) {
 		return;
 	}
 
-
-	const authQuery = 'SELECT passhash FROM account WHERE username = ${username};';
-	var values = {
-		'username': req.body.username
-	};
-
-	var authPromise = pgdb.one(authQuery, values)
+	var authPromise = pgdb.func('get_user_passhash', [req.body.username])
 		.catch((err) => {
 			if(err.received === 0) {
 				console.log('Invalid username \'' + req.body.username + '\' tried to log in.');
@@ -73,12 +67,8 @@ function putUserPassword(req, res) {
 
 	var passsalt = bcrypt.genSaltSync(10);
 	var passhash = bcrypt.hashSync(req.body.newPassword, passsalt);
-	values['passhash'] = passhash;
-
-	var queryStr = 'UPDATE account SET passhash = ${passhash} WHERE username = ${username};';
-
 	authPromise.then((data) => {
-		return pgdb.none(queryStr, values);
+		return pgdb.proc('put_user_passhash', [req.body.username, passhash]);
 	})
 	.then((data) => {
 		res.json(responseJson);

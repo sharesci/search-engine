@@ -14,13 +14,9 @@ function loginAction(req, res)  {
 		res.json(responseObj);
 		res.end();
 	}
-	const query = 'SELECT passhash FROM account WHERE username = ${username};';
-	var values = {
-		'username': req.body.username
-	};
-	pgdb.one(query, values)
+	pgdb.func('get_user_passhash', [req.body.username])
 		.then((data) => {
-			if (bcrypt.compareSync(req.body.password, data['passhash'])) {
+			if (bcrypt.compareSync(req.body.password, data[0]['passhash'])) {
 				req.session.user_id = req.body.username;
 				responseObj.errno = 0;
 				responseObj.errstr = "";

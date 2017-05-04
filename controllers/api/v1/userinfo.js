@@ -21,7 +21,7 @@ function getUserInfo(req, res) {
 		return;
 	}
 
-	pgdb.one('SELECT username, firstname, lastname, institution, self_bio FROM account WHERE username = ${username};', {'username': username})
+	pgdb.func('get_user_public_info', [username])
 	.then((data) => {
 		responseJson.userJson = data;
 		res.json(responseJson);
