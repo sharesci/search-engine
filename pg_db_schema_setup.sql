@@ -26,8 +26,31 @@ CREATE TABLE IF NOT EXISTS email_addr (
 		ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS document (
+	_id TEXT NOT NULL,
+	length DECIMAL(8,3) NOT NULL,
 
-CREATE TYPE public_user_info AS (username CITEXT, 
+	PRIMARY KEY (_id)
+);
+
+CREATE TABLE IF NOT EXISTS tf (
+	term TEXT NOT NULL,
+	docId TEXT NOT NULL,
+	lnc DECIMAL(11,4) NOT NULL,
+
+	PRIMARY KEY (term, docId),
+
+	FOREIGN KEY (docId) REFERENCES document(_id)		
+);
+
+CREATE TABLE IF NOT EXISTS idf (
+	term TEXT NOT NULL, 
+	idf DECIMAL(8,3) NOT NULL,
+
+	PRIMARY KEY (term)
+);
+
+CREATE TYPE public_user_info AS (username CITEXT,
 	firstname CITEXT, 
 	lastname CITEXT, 
 	institution CITEXT, 
