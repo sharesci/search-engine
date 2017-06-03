@@ -124,15 +124,16 @@ def load_files(root):
 
     for subdir, _, tar_files in os.walk(root):
         for tar_file in tar_files:
-            tar_file_path = subdir + os.path.sep + tar_file
-            tar = tarfile.open(tar_file_path)
-            for member in tar.getmembers():
-                file = tar.extractfile(member)
-                if file is not None: #only read regular files
-                    arxiv_id = tar_file[:4] + "-" + member.name.split("/")[-1][:-4]
-                    text = file.read().decode("utf-8")
-                    text = text.translate(str.maketrans('', '', string.punctuation))
-                    token_dict[arxiv_id] = text
+            if tar_file.endswith(".tar.gz"):
+                tar_file_path = subdir + os.path.sep + tar_file
+                tar = tarfile.open(tar_file_path)
+                for member in tar.getmembers():
+                    file = tar.extractfile(member)
+                    if file is not None: #only read regular files
+                        arxiv_id = tar_file[:4] + "-" + member.name.split("/")[-1][:-4]
+                        text = file.read().decode("utf-8")
+                        text = text.translate(str.maketrans('', '', string.punctuation))
+                        token_dict[arxiv_id] = text
 
     return token_dict
 
