@@ -46,7 +46,7 @@ def query_cosine_similarities(query_tfidf_tuples, doc_ids, max_results=20):
 	result = None
 	try:
 		values_str = ','.join(cur.mogrify('(%s, %s)', (tfidf_tuple[0],tfidf_tuple[1])).decode() for tfidf_tuple in query_tfidf_tuples)
-		sql = "SELECT docid, SUM(lnc*term_ltc) AS similarity FROM tf INNER JOIN (VALUES {}) AS query_matrix(query_term, term_ltc) ON query_term=term WHERE docid IN %s GROUP BY docid ORDER BY similarity DESC LIMIT %s".format(values_str)
+		sql = "SELECT text_id, SUM(lnc*term_ltc) AS similarity FROM tf INNER JOIN idf ON idf._id = term_id INNER JOIN (VALUES {}) AS query_matrix(query_term, term_ltc) ON query_term=idf.term INNER JOIN document ON document._id=doc_id WHERE document.text_id IN %s GROUP BY document.text_id ORDER BY similarity DESC LIMIT %s".format(values_str)
 		cur.execute(sql, (tuple(doc_ids), max_results))
 		result = cur.fetchall()
 	except psycopg2.Error as err:
@@ -59,13 +59,17 @@ def query_cosine_similarities(query_tfidf_tuples, doc_ids, max_results=20):
 def process_query(query):
 	if query is None or not re.match(r'\w', query):
 		return
+
 	mongo_result = papers_collection.find({'$and':[{'$text': {'$search': query}}]}, {'_id': 1, 'title': 1, 'authors': 1, 'updated-date': 1, 'score': {'$meta': 'textScore'}})
 
 	query_vectorizer = CountVectorizer(tokenizer=lambda text: [stemmer.stem(token) for token in nltk.word_tokenize(text)], stop_words='english')
 	query_raw_vector = query_vectorizer.fit_transform([query])
 	query_terms = query_vectorizer.get_feature_names()
+
 	term_idfs = get_idfs(query_terms)
+
 	print("IDF values for terms: ", term_idfs)
+
 	query_tuples = []
 	query_l2 = 0.0
 	rows, cols = query_raw_vector.nonzero()
@@ -79,6 +83,7 @@ def process_query(query):
 	query_l2 = np.sqrt(query_l2)
 	query_tuples = [(tup[0], tup[1]/query_l2) for tup in query_tuples]
 	document_ids = [str(item['_id']) for item in mongo_result]
+
 	doc_scores = query_cosine_similarities(query_tuples, document_ids)
 	print("The top 20  scores are: ", doc_scores)
 
