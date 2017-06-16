@@ -41,13 +41,13 @@ def get_idfs(terms):
 	cur.close()
 	return result
 
-def query_cosine_similarities(query_tfidf_tuples, doc_ids, max_results=20):
+def query_cosine_similarities(query_tfidf_tuples, max_results=20):
 	cur = pg_conn.cursor()
 	result = None
 	try:
 		values_str = ','.join(cur.mogrify('(%s, %s)', (tfidf_tuple[0],tfidf_tuple[1])).decode() for tfidf_tuple in query_tfidf_tuples)
-		sql = "SELECT text_id, SUM(lnc*term_ltc) AS similarity FROM tf INNER JOIN idf ON idf._id = term_id INNER JOIN (VALUES {}) AS query_matrix(query_term, term_ltc) ON query_term=idf.term INNER JOIN document ON document._id=doc_id WHERE document.text_id IN %s GROUP BY document.text_id ORDER BY similarity DESC LIMIT %s".format(values_str)
-		cur.execute(sql, (tuple(doc_ids), max_results))
+		sql = "SELECT text_id, SUM(lnc*term_ltc) AS similarity FROM tf INNER JOIN idf ON idf._id = term_id INNER JOIN (VALUES {}) AS query_matrix(query_term, term_ltc) ON query_term=idf.term INNER JOIN document ON document._id=doc_id GROUP BY document.text_id ORDER BY similarity DESC LIMIT %s".format(values_str)
+		cur.execute(sql, (max_results,))
 		result = cur.fetchall()
 	except psycopg2.Error as err:
 		print('Failed to get term DFs', file=sys.stderr)
@@ -59,8 +59,6 @@ def query_cosine_similarities(query_tfidf_tuples, doc_ids, max_results=20):
 def process_query(query):
 	if query is None or not re.match(r'\w', query):
 		return
-
-	mongo_result = papers_collection.find({'$and':[{'$text': {'$search': query}}]}, {'_id': 1, 'title': 1, 'authors': 1, 'updated-date': 1, 'score': {'$meta': 'textScore'}})
 
 	query_vectorizer = CountVectorizer(tokenizer=lambda text: [stemmer.stem(token) for token in nltk.word_tokenize(text)], stop_words='english')
 	query_raw_vector = query_vectorizer.fit_transform([query])
@@ -82,9 +80,8 @@ def process_query(query):
 		query_l2 += tfidf*tfidf
 	query_l2 = np.sqrt(query_l2)
 	query_tuples = [(tup[0], tup[1]/query_l2) for tup in query_tuples]
-	document_ids = [str(item['_id']) for item in mongo_result]
 
-	doc_scores = query_cosine_similarities(query_tuples, document_ids)
+	doc_scores = query_cosine_similarities(query_tuples)
 	print("The top 20  scores are: ", doc_scores)
 
 if __name__ == '__main__':
