@@ -56,7 +56,7 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20):
 	cur.close()
 	return result
 
-def process_query(query):
+def process_query(query, max_results=20):
 	if query is None or not re.match(r'\w', query):
 		return
 
@@ -81,8 +81,7 @@ def process_query(query):
 	query_l2 = np.sqrt(query_l2)
 	query_tuples = [(tup[0], tup[1]/query_l2) for tup in query_tuples]
 
-	doc_scores = query_cosine_similarities(query_tuples)
-	print("The top 20  scores are: ", doc_scores)
+	return query_cosine_similarities(query_tuples, max_results=max_results)
 
 if __name__ == '__main__':
 
@@ -90,7 +89,8 @@ if __name__ == '__main__':
 	try:
 		while query != 'exit':
 			query = input('Type your query: ')
-			process_query(query)
+			doc_scores = process_query(query, max_results=20)
+			print("The top 20  scores are: ", doc_scores)
 	except EOFError as err:
 		print('exit')
 
