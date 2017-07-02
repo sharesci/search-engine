@@ -6,14 +6,14 @@ printf "Using up to %d parallel processes\n" "$max_processes"
 
 declare -a arg_sets
 init_arg_sets() {
-	for file in ../../arxiv/preproc_split/d* ; do
+	for file in ../../arxiv/preproc_split_subset/d* ; do
 		arg_sets+=("$file")
 	done
 }
 init_arg_sets
 
 run_arg_set() {
-	python3 indexer.py "$1"
+	python3 bigram_indexer.py -d "$1" --new-docs -m ./results2.json
 }
 
 ulimit -v 10000000
