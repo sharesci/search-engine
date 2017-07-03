@@ -10,6 +10,7 @@ from bson.objectid import ObjectId
 import re
 from sklearn.feature_extraction.text import CountVectorizer
 import sys
+import time
 
 pg_conn = psycopg2.connect("dbname='sharesci' user='sharesci' host='137.148.143.96' password='sharesci'")
 mongo_client = pymongo.MongoClient('137.148.143.48', 27017)
@@ -136,7 +137,7 @@ def attach_metadata(results):
 
 
 def pretty_print_metadata_results(results):
-	print('{:2s}  {:100s}  {:15s}  {:7s}        '.format('#', 'Title', 'arXiv id', 'Score'))
+	print('{:>2s}  {:100s}  {:15s}  {:7s}        '.format('#', 'Title', 'arXiv id', 'Score'))
 	result_num = 1
 	for result in results:
 		print('{:2d}. {:100s}  {:15s}  {:0.5f}    '.format(result_num, re.sub('[ ]*\n[ ]*', ' ', result['title']), result['arxiv_id'], result['score']))
@@ -148,11 +149,21 @@ if __name__ == '__main__':
 	query = None
 	try:
 		while query != 'exit':
+			times = {}
+
 			query = input('Type your query: ')
+
+			start_time = time.perf_counter()
 			doc_scores = process_query(query, max_results=20)
+			times['query'] = time.perf_counter() - start_time
+			
+			start_time = time.perf_counter()
 			metadata_results = attach_metadata(doc_scores)
+			times['mongo'] = time.perf_counter() - start_time
+
 			print("The top 20 scores are:")
 			pretty_print_metadata_results(metadata_results)
+			print('\n{:0.4f}s to perform the query, {:0.4f}s to get the metadata for results from Mongo\n'.format(times['query'], times['mongo']))
 	except EOFError as err:
 		print('exit')
 
