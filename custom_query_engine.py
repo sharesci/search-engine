@@ -6,12 +6,13 @@ import numpy as np
 from pprint import pprint
 import psycopg2
 import pymongo
+from bson.objectid import ObjectId
 import re
 from sklearn.feature_extraction.text import CountVectorizer
 import sys
 
 pg_conn = psycopg2.connect("dbname='sharesci' user='sharesci' host='137.148.143.96' password='sharesci'")
-mongo_client = pymongo.MongoClient('localhost', 27017)
+mongo_client = pymongo.MongoClient('137.148.143.48', 27017)
 
 mongo_db = mongo_client['sharesci']
 papers_collection = mongo_db['papers']
@@ -119,6 +120,29 @@ def process_query(query, max_results=20):
 
 	return query_cosine_similarities(query_tuples, max_results=max_results)
 
+def attach_metadata(results):
+	metadata_results = []
+	for result in results:
+		metadata = {'raw_id': result[0], 'title': '', 'arxiv_id': '', 'score': result[1]}
+		if len(result[0]) == 24:
+			mongo_result = papers_collection.find({'_id': ObjectId(result[0])})[0]
+			metadata['title'] = mongo_result['title'];
+			metadata['arxiv_id'] = mongo_result['arXiv_id'];
+			metadata['mongo_id'] = result[0];
+		else:
+			metadata['arxiv_id'] = result[0];
+		metadata_results.append(metadata);
+	return metadata_results;
+
+
+def pretty_print_metadata_results(results):
+	print('{:2s}  {:100s}  {:15s}  {:7s}        '.format('#', 'Title', 'arXiv id', 'Score'))
+	result_num = 1
+	for result in results:
+		print('{:2d}. {:100s}  {:15s}  {:0.5f}    '.format(result_num, re.sub('[ ]*\n[ ]*', ' ', result['title']), result['arxiv_id'], result['score']))
+		result_num += 1
+
+
 if __name__ == '__main__':
 
 	query = None
@@ -126,7 +150,9 @@ if __name__ == '__main__':
 		while query != 'exit':
 			query = input('Type your query: ')
 			doc_scores = process_query(query, max_results=20)
-			print("The top 20 scores are: ", doc_scores)
+			metadata_results = attach_metadata(doc_scores)
+			print("The top 20 scores are:")
+			pretty_print_metadata_results(metadata_results)
 	except EOFError as err:
 		print('exit')
 
