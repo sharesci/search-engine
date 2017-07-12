@@ -20,7 +20,7 @@ CONN = psycopg2.connect("dbname='sharesci' user='sharesci' host='localhost' pass
 def insert(sql, data):
     cursor = CONN.cursor()
     try:
-        psycopg2.extras.execute_values(cursor, sql, data, page_size=1000)
+        psycopg2.extras.execute_values(cursor, sql, data, page_size=10000)
     except psycopg2.Error as error:
         print("Database error occured while executing '", sql, "'", 'Data: ')
         print(len(data), data[:10], data[-10:])
@@ -42,23 +42,22 @@ def get_database_size():
     return size
 
 def get_doc_ids(text_ids):
-    doc_ids = []
+    doc_id_dict = {}
     cursor = CONN.cursor()
-    sql = "SELECT _id FROM document WHERE text_id = '{0}'"
-    for text_id in text_ids:
-        try:
-            cursor.execute(sql.format(text_id))
-            data = cursor.fetchone()
-            if data:
-            	doc_ids.append(data[0])
-            else:
-                print("Warning: Could not find the doc_id for document {}".format(text_id))
-        except psycopg2.Error as error:
-            print('Failed to get doc_id', file=sys.stderr)
-            print(error.diag.message_primary)
+    sql = """SELECT text_ids.text_id, d._id
+             FROM (VALUES %s) text_ids(text_id)
+             INNER JOIN document d
+                 ON text_ids.text_id = d.text_id
+             GROUP BY text_ids.text_id, d._id"""
+    try:
+        psycopg2.extras.execute_values(cursor, sql, [(text_id,) for text_id in text_ids], page_size=10000)
+        doc_id_dict = dict(cursor.fetchall())
+    except psycopg2.Error as error:
+        print('Failed to get doc_id', file=sys.stderr)
+        print(error.diag.message_primary)
     CONN.commit()
     cursor.close()
-    return doc_ids
+    return doc_id_dict
 
 def populate_tables(raw_tf, text_ids, terms, options):
     """Populate the idf, document, tf tables.
@@ -77,34 +76,45 @@ def populate_tables(raw_tf, text_ids, terms, options):
     doc_lengths = LA.norm(lnc, axis=1).reshape(-1, 1)
     print("Finished.")
 
-    if options.new_docs:
-        doc_table = np.hstack((text_ids.reshape(-1, 1), doc_lengths))
+    doc_types_key = {'title': 2, 'abstract': 3, 'authors': 4}
 
-        sql = """INSERT INTO document (text_id, length)
+    excluded_docs = set([])
+
+    if options.new_docs:
+        if options.get_parent_docs:
+            parent_table = np.array([text_id.split('_')[-1] for text_id in text_ids])
+            parent_ids_dict = get_doc_ids(parent_table)
+            parent_id_keys = parent_ids_dict.keys()
+            excluded_docs |= set([i for i in range(len(text_ids)) if parent_table[i] not in parent_id_keys])
+            doc_table = [(text_ids[i], doc_lengths[i][0], parent_ids_dict[parent_table[i]], doc_types_key[text_ids[i].partition('_')[0]]) for i in range(len(text_ids)) if i not in excluded_docs]
+        else:
+            doc_table = [(text_ids[i], doc_lengths[i][0], None, 1) for i in range(len(text_ids)) if i not in excluded_docs]
+
+        sql = """INSERT INTO document (text_id, length, parent_doc, type)
                 VALUES %s
                 ON CONFLICT (text_id) DO UPDATE 
                     SET length=EXCLUDED.length"""
 
-        print("Inserting data into document table.")
-        insert(sql, doc_table.tolist())
+        print("Inserting {} records into document table.".format(len(doc_table)))
+        insert(sql, doc_table)
         print("Data inserted.")
 
     gram_ids = []
     tf_values = []
-    #bigram_terms = [[term.partition(' ')[0], term.partition(' ')[2]] for term in terms]
-    bigram_terms = [[term, ''] for term in terms]
+    bigram_terms = [[term.partition(' ')[0], term.partition(' ')[2]] for term in terms]
     df_values = np.zeros(len(bigram_terms), dtype=np.int8).tolist()
     bigram_length = len(bigram_terms)
 
     rows, cols = lnc.nonzero()
-    for col in cols:
-        df_values[col] += 1 #calculate document frequency
+    for row, col in zip(rows, cols):
+        if row not in excluded_docs:
+            df_values[col] += 1 #calculate document frequency
 
     print("Inserting {} bigrams".format(bigram_length))
 
     m = n = 0
     while m < bigram_length:
-        n = (m+10000) if (m+10000) <= bigram_length else m+(bigram_length%10000);
+        n = (m+100000) if (m+100000) <= bigram_length else m+(bigram_length % 100000);
         cursor = CONN.cursor()
         try:
             cursor.callproc('insert_bigram_df', [bigram_terms[m:n], df_values[m:n]])
@@ -117,7 +127,7 @@ def populate_tables(raw_tf, text_ids, terms, options):
             print(error)
         CONN.commit()
         cursor.close()
-        m += 10000
+        m += 100000
         if bigram_length-m > 0 and (m/1000000).is_integer():
             print("{} bigrams remaining.".format(bigram_length-m))
     print("Data Inserted")
@@ -128,7 +138,8 @@ def populate_tables(raw_tf, text_ids, terms, options):
     doc_ids = get_doc_ids(text_ids)
     print("Calculating tf values.")
     for row, col in zip(rows, cols):
-        tf_values.append([gram_ids[col], doc_ids[row], float(lnc[row, col]/doc_lengths[row])])
+        if text_ids[row] in doc_ids.keys():
+            tf_values.append([gram_ids[col], doc_ids[text_ids[row]], float(lnc[row, col]/doc_lengths[row])])
 
     print("Inserting {} rows into tf table".format(len(tf_values)))
     sql = """INSERT INTO tf(gram_id, doc_id, lnc)
@@ -169,12 +180,31 @@ def load_files(root, mappings):
 
     return token_dict
 
+
+def index_terms(token_dict, options):
+    print("Calculating raw tf values.")
+    VECTORIZER = CountVectorizer(token_pattern=r'(?u)\b\w[A-Za-z_-]{1,19}\b', ngram_range=(1, 2))
+    RAW_TF = VECTORIZER.fit_transform(token_dict.values())
+    print("Calculation of raw tf values complete.")
+    TERMS = VECTORIZER.get_feature_names()
+    DOC_IDS = np.array(list(token_dict.keys()))
+
+    # Attempt to reduce memory usage by destroying potentially large objects
+    TOKEN_DICT = None
+    VECTORIZER = None
+    mappings = None
+    gc.collect()
+
+    populate_tables(RAW_TF, DOC_IDS, TERMS, options)
+
+
 if __name__ == "__main__":
 
     PARSER = OptionParser()
     PARSER.add_option("-d", dest="doc_dir")
     PARSER.add_option("-m", dest="mapping_file")
     PARSER.add_option("--new-docs", action="store_true", default=False, dest="new_docs")
+    PARSER.add_option("--get-parent-docs", default=False, action="store_true", dest="get_parent_docs", help="For each text doc id, assume the portion following the last '_' is the text doc id of the parent doc, and update the database accordingly. This only has an effect if --new-docs is also specified")
 
     (OPTIONS, ARGS) = PARSER.parse_args()
 
@@ -182,32 +212,17 @@ if __name__ == "__main__":
     if get_database_size() > MAX_DATABASE_SIZE:
         print("Database is too big! Can't fit more data within the limit!", file=sys.stderr)
         sys.exit(1)
-    if OPTIONS.doc_dir:
+
+    if OPTIONS.doc_dir and OPTIONS.mapping_file:
         mappings = [[], []]
-        if OPTIONS.mapping_file:
-            with open(OPTIONS.mapping_file) as f:
-                data = eval(f.readline())
-                for d in data:
-                    mappings[0].append(d["arXiv_id"])
-                    mappings[1].append(d["_id"])
+        with open(OPTIONS.mapping_file) as f:
+            data = eval(f.readline())
+            for d in data:
+                mappings[0].append(d["arXiv_id"])
+                mappings[1].append(d["_id"])
 
         TOKEN_DICT = load_files(OPTIONS.doc_dir, mappings)
-        print("Calculating raw tf values.")
-        #VECTORIZER = CountVectorizer(token_pattern=r'(?u)\b\w[A-Za-z_-]{1,19}\b', ngram_range=(2, 2))
-        VECTORIZER = CountVectorizer(token_pattern=r'(?u)\b\w[A-Za-z_-]{1,19}\b', ngram_range=(1, 1))
-        RAW_TF = VECTORIZER.fit_transform(TOKEN_DICT.values())
-        print("Calculation of raw tf values complete.")
-        TERMS = VECTORIZER.get_feature_names()
-        DOC_IDS = np.array(list(TOKEN_DICT.keys()))
-
-        # Attempt to reduce memory usage by destroying potentially large objects
-        TOKEN_DICT = None
-        VECTORIZER = None
-        mappings = None
-        gc.collect()
-            
-        populate_tables(RAW_TF, DOC_IDS, TERMS, OPTIONS)
-
+        index_terms(TOKEN_DICT, OPTIONS)
         print("All done.")
     else:
         print("Please specify path to the folder which contains all .tar.gz")

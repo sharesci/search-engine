@@ -58,18 +58,27 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20):
 	result = None
 	try:
 		values_str = ','.join(cur.mogrify('(%s, %s)', (tfidf_tuple[0],tfidf_tuple[1])).decode() for tfidf_tuple in query_tfidf_tuples)
-		sql = "SELECT text_id, SUM(lnc*term_ltc) AS similarity FROM tf INNER JOIN idf ON idf._id = term_id INNER JOIN (VALUES {}) AS query_matrix(query_term, term_ltc) ON query_term=idf.term INNER JOIN document ON document._id=doc_id GROUP BY document.text_id ORDER BY similarity DESC LIMIT %s".format(values_str)
-		sql = """SELECT text_id,
-				SUM(lnc*term_ltc) AS similarity
-			FROM tf
-			INNER JOIN (VALUES {}) AS query_matrix(query_gram_id, term_ltc)
-				ON query_gram_id=tf.gram_id
-			INNER JOIN gram
-				ON (gram.gram_id = tf.gram_id)
-			INNER JOIN document
-				ON document._id=doc_id
-			GROUP BY document.text_id
-			ORDER BY similarity DESC LIMIT %s
+		sql = """
+			SELECT (SELECT text_id FROM document d2 WHERE d2._id = dg_id) AS "text_id", similarity 
+			FROM (
+				SELECT COALESCE(document.parent_doc, document._id) AS "dg_id",
+					SUM(lnc*term_ltc*(
+						CASE document.type 
+							WHEN 1 THEN 0.4 
+							ELSE 0.2 
+						END)
+					) AS similarity
+				FROM tf
+				INNER JOIN (VALUES {}) AS query_matrix(query_gram_id, term_ltc)
+					ON query_gram_id=tf.gram_id
+				INNER JOIN gram
+					ON (gram.gram_id = tf.gram_id)
+				INNER JOIN document
+					ON document._id=doc_id
+				GROUP BY dg_id
+				ORDER BY similarity DESC LIMIT %s
+			) AS subquery_1
+			;
 		""".format(values_str);
 		cur.execute(sql, (max_results,))
 		result = cur.fetchall()
@@ -82,12 +91,6 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20):
 
 
 def make_query_vector(query_string):
-	#query_vectorizer = CountVectorizer(tokenizer=lambda text: [stemmer.stem(token) for token in nltk.word_tokenize(text)], stop_words='english', ngram_range=(2,2))
-	#query_raw_vector = query_vectorizer.fit_transform([query])
-	#query_terms = query_vectorizer.get_feature_names()
-	#query_terms = [(term.partition(' ')[0], term.partition(' ')[2]) for term in query_vectorizer.get_feature_names()]
-	#query_vec = [(query_terms[i], query_raw_vector[0, i]) for i in range(len(query_terms))]
-
 	query_tokens = [stemmer.stem(token) for token in nltk.word_tokenize(query_string)]
 	query_vec = []
 	for tok1 in query_tokens:
