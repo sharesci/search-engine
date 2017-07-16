@@ -8,7 +8,7 @@ import pymongo
 from bson.objectid import ObjectId
 import re
 
-mongo_client = pymongo.MongoClient('localhost', 27017)
+mongo_client = pymongo.MongoClient('137.148.143.48', 27017)
 
 mongo_db = mongo_client['sharesci']
 papers_collection = mongo_db['papers']

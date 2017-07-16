@@ -1,5 +1,12 @@
 #!/usr/bin/python3
 
+## @file
+#
+# Script to query the database. It can be used in interactive mode, or
+# imported from another script (in which case #perform_query can be used to do
+# queries)
+#
+
 import nltk
 from nltk.stem.porter import PorterStemmer
 import numpy as np
@@ -20,6 +27,14 @@ papers_collection = mongo_db['papers']
 
 stemmer = PorterStemmer(mode=PorterStemmer.MARTIN_EXTENSIONS)
 
+## Get the IDF values for the given terms
+# 
+# @param terms (list-like)
+# <br>	Format: A list of terms (each term as str)
+# 
+# @return (dict) 
+# <br>	-- a dict with keys being terms (as str) and values being tuples
+# 	of `(gram_id, IDF)`
 def get_idfs(terms):
 	cur = pg_conn.cursor()
 	result = None
@@ -43,7 +58,7 @@ def get_idfs(terms):
 		for t in result_tuples:
 			term = (t[0],t[1])
 			gram_id = t[2]
-			df = float(t[3])
+			df = float(t[3]) + 1    # Add 1 to protect against div-by-zero
 			idf = np.log(1 + (num_docs / df))
 			result[term] = (gram_id, idf)
 	except psycopg2.Error as err:
@@ -53,6 +68,29 @@ def get_idfs(terms):
 	cur.close()
 	return result
 
+
+## Compute the most similar documents, given a query vector
+#
+# "Similarity" here refers to cosine similarity. This function considers all
+# documents, including the sub-documents representing titles, abstracts,
+# authors, etc, and computes the cosine similarity of each with the query
+# vector. It then takes a weighted sum of grouped documents for the final
+# similarity score. A document "group" consists of the main (fulltext)
+# document and all sub-documents (i.e., documents which are in a parent-child
+# relationship with the main document in the database).
+#
+# @param query_tfidf_tuples (list)
+# <br>	Format: `[(gram_id (int), term_ltc (float)), ...]`
+# <br>	-- a query vector containing tuples of gram IDs paired with their 
+# 	TF-IDF score
+#
+# @param max_results (int)
+# <br>	-- The maximum number of results to return
+#
+# @return (list)
+# <br>	Format: `[(text_id (str), similarity (float)), ...]`
+# <br>	-- A list of tuples containing document IDs paired with similarity 
+# 	scores, sorted by similarity.
 def query_cosine_similarities(query_tfidf_tuples, max_results=20):
 	cur = pg_conn.cursor()
 	result = None
@@ -90,16 +128,31 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20):
 	return result
 
 
+## Create query vector from a query string
+#
+# @param query_string (str)
+# <br>	-- The query string
+#
+# @return (list) a vector of query terms. Each term is a tuple of two strings,
+# 	representing a bigram (or unigram if the second term is '')
+#
 def make_query_vector(query_string):
 	query_tokens = [stemmer.stem(token) for token in nltk.word_tokenize(query_string)]
 	query_vec = []
 	for tok1 in query_tokens:
 		query_vec.append(((tok1, ''), 1))
-		for tok2 in query_tokens:
-			query_vec.append(((tok1, tok2), 1))
+		#for tok2 in query_tokens:
+		#	query_vec.append(((tok1, tok2), 1))
 	return query_vec;
 
 
+## Process the given query
+#
+# @param query (str)
+# <br>	-- The query string (plain text; just space-separated words)
+#
+# @param max_results (int) the maximum number of results to return
+#
 def process_query(query, max_results=20):
 	if query is None or not re.match(r'\w', query):
 		return
@@ -124,6 +177,15 @@ def process_query(query, max_results=20):
 
 	return query_cosine_similarities(query_tuples, max_results=max_results)
 
+## Retrieve metadata for a document
+#
+# @param results (list)
+# <br>	Format: `[(text_id, similarity_score), ...]`
+# <br>	-- List of tuples of a document text ID and the corresponding
+# 	similarity score (from some query).
+#
+# @return (list) a list of dicts containing metadata of the document
+#
 def attach_metadata(results):
 	metadata_results = []
 	for result in results:
@@ -139,6 +201,13 @@ def attach_metadata(results):
 	return metadata_results;
 
 
+## Pretty-print a list of search results
+#
+# @param results (list)
+# <br>	Format: `[(text_id, similarity_score), ...]`
+# <br>	-- List of tuples of a document text ID and the corresponding
+# 	similarity score (from some query).
+#
 def pretty_print_metadata_results(results):
 	print('{:>2s}  {:100s}  {:15s}  {:7s}        '.format('#', 'Title', 'arXiv id', 'Score'))
 	result_num = 1

@@ -1,4 +1,4 @@
-\connect sharesci;
+\connect sharesci2;
 
 CREATE EXTENSION IF NOT EXISTS CITEXT;
 
@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS document (
 	_id SERIAL NOT NULL,
 	text_id TEXT UNIQUE NOT NULL,
 	length DOUBLE PRECISION NOT NULL,
+	parent_doc INTEGER,
+	"type" SMALLINT NOT NULL DEFAULT 1,
 
 	PRIMARY KEY (_id)
 );
@@ -46,7 +48,7 @@ CREATE TABLE IF NOT EXISTS gram (
 	term_id_1 INT NOT NULL,
 	term_id_2 INT,
 
-	PRIMARY KEY (gram_id ASC, term_id_1 ASC, term_id_2 ASC),
+	PRIMARY KEY (gram_id, term_id_1, term_id_2),
 	FOREIGN KEY (term_id_1) REFERENCES term(_id),
 	FOREIGN KEY (term_id_2) REFERENCES term(_id)
 );
