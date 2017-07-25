@@ -19,6 +19,13 @@ from sklearn.feature_extraction.text import CountVectorizer
 import sys
 import time
 
+DEFAULT_QUERY_WEIGHTS = {
+	'fulltext': 0.4,
+	'title': 0.2,
+	'abstract': 0.2,
+	'authors': 0.2,
+}
+
 pg_conn = psycopg2.connect("dbname='sharesci' user='sharesci' host='137.148.143.96' password='sharesci'")
 mongo_client = pymongo.MongoClient('137.148.143.48', 27017)
 
@@ -91,33 +98,48 @@ def get_idfs(terms):
 # <br>	Format: `[(text_id (str), similarity (float)), ...]`
 # <br>	-- A list of tuples containing document IDs paired with similarity 
 # 	scores, sorted by similarity.
-def query_cosine_similarities(query_tfidf_tuples, max_results=20):
+def query_cosine_similarities(query_tfidf_tuples, max_results=20, weights=DEFAULT_QUERY_WEIGHTS):
 	cur = pg_conn.cursor()
 	result = None
 	try:
 		values_str = ','.join(cur.mogrify('(%s, %s)', (tfidf_tuple[0],tfidf_tuple[1])).decode() for tfidf_tuple in query_tfidf_tuples)
-		sql = """
-			SELECT (SELECT text_id FROM document d2 WHERE d2._id = dg_id) AS "text_id", similarity 
-			FROM (
-				SELECT COALESCE(document.parent_doc, document._id) AS "dg_id",
-					SUM(lnc*term_ltc*(
-						CASE document.type 
-							WHEN 1 THEN 0.4 
-							ELSE 0.2 
-						END)
-					) AS similarity
-				FROM tf
-				INNER JOIN (VALUES {}) AS query_matrix(query_gram_id, term_ltc)
-					ON query_gram_id=tf.gram_id
-				INNER JOIN gram
-					ON (gram.gram_id = tf.gram_id)
-				INNER JOIN document
-					ON document._id=doc_id
-				GROUP BY dg_id
-				ORDER BY similarity DESC LIMIT %s
-			) AS subquery_1
-			;
-		""".format(values_str);
+	except psycopg2.Error as err:
+		print('Failed to stringify values table for cosine similarity query', file=sys.stderr)
+		print(err.diag.message_primary, file=sys.stderr)
+
+	sql = """
+		SELECT (SELECT text_id FROM document d2 WHERE d2._id = dg_id) AS "text_id", similarity 
+		FROM (
+			SELECT COALESCE(document.parent_doc, document._id) AS "dg_id",
+				SUM(lnc*term_ltc*(
+					CASE document.type 
+						WHEN 1 THEN {fulltext_weight:0.4f} 
+						WHEN 2 THEN {title_weight:0.4f} 
+						WHEN 3 THEN {abstract_weight:0.4f} 
+						WHEN 4 THEN {authors_weight:0.4f} 
+						ELSE 0.0 
+					END)
+				) AS similarity
+			FROM tf
+			INNER JOIN (VALUES {valuetbl}) AS query_matrix(query_gram_id, term_ltc)
+				ON query_gram_id=tf.gram_id
+			INNER JOIN gram
+				ON (gram.gram_id = tf.gram_id)
+			INNER JOIN document
+				ON document._id=doc_id
+			GROUP BY dg_id
+			ORDER BY similarity DESC LIMIT %s
+		) AS subquery_1
+		;
+	""".format(
+		valuetbl=values_str,
+		fulltext_weight=weights['fulltext'],
+		title_weight=weights['title'],
+		abstract_weight=weights['abstract'],
+		authors_weight=weights['authors'],
+	);
+
+	try:
 		cur.execute(sql, (max_results,))
 		result = cur.fetchall()
 	except psycopg2.Error as err:
@@ -141,8 +163,8 @@ def make_query_vector(query_string):
 	query_vec = []
 	for tok1 in query_tokens:
 		query_vec.append(((tok1, ''), 1))
-		#for tok2 in query_tokens:
-		#	query_vec.append(((tok1, tok2), 1))
+		for tok2 in query_tokens:
+			query_vec.append(((tok1, tok2), 1))
 	return query_vec;
 
 
@@ -153,7 +175,7 @@ def make_query_vector(query_string):
 #
 # @param max_results (int) the maximum number of results to return
 #
-def process_query(query, max_results=20):
+def process_query(query, max_results=20, weights=DEFAULT_QUERY_WEIGHTS, print_idfs=True):
 	if query is None or not re.match(r'\w', query):
 		return
 
@@ -161,7 +183,8 @@ def process_query(query, max_results=20):
 
 	term_idfs = get_idfs([v[0] for v in query_vec])
 
-	print("IDF values for terms: ", term_idfs)
+	if print_idfs:
+		print("IDF values for terms: ", term_idfs)
 
 	query_tuples = []
 	query_l2 = 0.0
@@ -175,7 +198,7 @@ def process_query(query, max_results=20):
 	query_l2 = np.sqrt(query_l2)
 	query_tuples = [(tup[0], tup[1]/query_l2) for tup in query_tuples]
 
-	return query_cosine_similarities(query_tuples, max_results=max_results)
+	return query_cosine_similarities(query_tuples, max_results=max_results, weights=weights)
 
 ## Retrieve metadata for a document
 #
