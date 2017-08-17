@@ -111,7 +111,7 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20, weights=DEFAUL
 		SELECT (SELECT text_id FROM document d2 WHERE d2._id = dg_id) AS "text_id", similarity 
 		FROM (
 			SELECT COALESCE(document.parent_doc, document._id) AS "dg_id",
-				SUM(lnc*term_ltc*(
+				COALESCE(SUM(lnc*term_ltc*(
 					CASE document.type 
 						WHEN 1 THEN {fulltext_weight:0.4f} 
 						WHEN 2 THEN {title_weight:0.4f} 
@@ -119,13 +119,13 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20, weights=DEFAUL
 						WHEN 4 THEN {authors_weight:0.4f} 
 						ELSE 0.0 
 					END)
-				) AS similarity
+				), 0) AS similarity
 			FROM tf
 			INNER JOIN (VALUES {valuetbl}) AS query_matrix(query_gram_id, term_ltc)
 				ON query_gram_id=tf.gram_id
 			INNER JOIN gram
 				ON (gram.gram_id = tf.gram_id)
-			INNER JOIN document
+			RIGHT OUTER JOIN document
 				ON document._id=doc_id
 			GROUP BY dg_id
 			ORDER BY similarity DESC LIMIT %s
@@ -160,6 +160,7 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20, weights=DEFAUL
 #
 def make_query_vector(query_string):
 	query_tokens = [stemmer.stem(token) for token in nltk.word_tokenize(query_string)]
+	#query_tokens = [token for token in nltk.word_tokenize(query_string)]
 	query_vec = []
 	for tok1 in query_tokens:
 		query_vec.append(((tok1, ''), 1))
@@ -176,7 +177,8 @@ def make_query_vector(query_string):
 # @param max_results (int) the maximum number of results to return
 #
 def process_query(query, max_results=20, weights=DEFAULT_QUERY_WEIGHTS, print_idfs=True):
-	if query is None or not re.match(r'\w', query):
+	if query is None or not re.match(r'[ \w]*\w[ \w]*', query):
+		print('fail1')
 		return
 
 	query_vec = make_query_vector(query)
