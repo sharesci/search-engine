@@ -21,6 +21,10 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
 from scipy.sparse import linalg as LA
 from optparse import OptionParser
+import nltk
+from nltk.stem.porter import PorterStemmer
+
+stemmer = PorterStemmer(mode=PorterStemmer.MARTIN_EXTENSIONS)
 
 DOC_TYPES_KEY = {
                     'title': 2,
@@ -28,7 +32,7 @@ DOC_TYPES_KEY = {
                     'authors': 4
                 }
 
-CONN = psycopg2.connect("dbname='sharesci2' user='sharesci' host='localhost' password='sharesci'")
+CONN = psycopg2.connect("dbname='sharesci' user='sharesci' host='localhost' password='sharesci'")
 
 ## Insert data into the database.
 #
@@ -162,7 +166,7 @@ def populate_tables(raw_tf, text_ids, terms, options):
     excluded_docs = set([])
 
     if options.new_docs:
-        excluded_docs |= populate_document_table(term_ids, doc_lengths, options)
+        excluded_docs |= populate_document_table(text_ids, doc_lengths, options)
 
     gram_ids = []
     tf_values = []
@@ -182,7 +186,7 @@ def populate_tables(raw_tf, text_ids, terms, options):
     while num_inserted < bigram_length:
         cursor = CONN.cursor()
         try:
-            cursor.callproc('insert_bigram_df', [bigram_terms[m:(m+bigram_batch_size)], df_values[m:(m+bigram_batch_size)]])
+            cursor.callproc('insert_bigram_df', [bigram_terms[num_inserted:(num_inserted+bigram_batch_size)], df_values[num_inserted:(num_inserted+bigram_batch_size)]])
             data = cursor.fetchone()
             if data:
                 gram_ids += data[0]
@@ -253,7 +257,9 @@ def load_files(root, mappings):
 
 def index_terms(token_dict, options):
     print("Calculating raw tf values.")
-    vectorizer = CountVectorizer(token_pattern=r'(?u)\b\w[A-Za-z_-]{1,19}\b', ngram_range=(1, 2))
+    #vectorizer = CountVectorizer(token_pattern=r'(?u)\b\w[A-Za-z_-]{1,19}\b', ngram_range=(1, 2))
+    #vectorizer = CountVectorizer(tokenizer=lambda x: [token for token in nltk.word_tokenize(x)], ngram_range=(1, 2))
+    vectorizer = CountVectorizer(tokenizer=lambda x: [stemmer.stem(token) for token in nltk.word_tokenize(x)], ngram_range=(1, 2))
     raw_tf = vectorizer.fit_transform(token_dict.values())
     print("Calculation of raw tf values complete.")
     terms = vectorizer.get_feature_names()
