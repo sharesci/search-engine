@@ -122,7 +122,7 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20, weights=DEFAUL
 				), 0) AS similarity
 			FROM tf
 			INNER JOIN (VALUES {valuetbl}) AS query_matrix(query_gram_id, term_ltc)
-				ON query_gram_id=tf.gram_id
+				ON CAST(query_gram_id AS INT)=tf.gram_id
 			INNER JOIN gram
 				ON (gram.gram_id = tf.gram_id)
 			RIGHT OUTER JOIN document
@@ -162,10 +162,17 @@ def make_query_vector(query_string):
 	query_tokens = [stemmer.stem(token) for token in nltk.word_tokenize(query_string)]
 	#query_tokens = [token for token in nltk.word_tokenize(query_string)]
 	query_vec = []
-	for tok1 in query_tokens:
-		query_vec.append(((tok1, ''), 1))
-		for tok2 in query_tokens:
-			query_vec.append(((tok1, tok2), 1))
+	for i in range(len(query_tokens)):
+		tok1 = query_tokens[i]
+		tok2 = ''
+		if i < len(query_tokens)-1:
+			query_vec.append(((tok1, ''), 1))
+			tok2 = query_tokens[i+1]
+		query_vec.append(((tok1, tok2), 1))
+	#for tok1 in query_tokens:
+	#	query_vec.append(((tok1, ''), 1))
+	#	for tok2 in query_tokens:
+	#		query_vec.append(((tok1, tok2), 1))
 	return query_vec;
 
 
