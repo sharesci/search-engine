@@ -3,6 +3,12 @@ from cntk.ops.functions import load_model
 import os
 import pickle
 import numpy as np
+import heapq
+import sys
+
+# This script gets the nearest neighbors of the word entered at the prompt.
+# Run with --random-words to get the old behavior of selecting a group of
+# random words instead of prompting.
 
 def get_token(token2id, token_id):
 	return list(token2id.keys())[list(token2id.values()).index(token_id)]
@@ -26,25 +32,62 @@ training_data = pickle.load(open('tmp_textdata.pickle', 'rb'))
 token2id = training_data.token2id
 id2token = {v: k for k, v in token2id.items()}
 
-test_word_indices = np.random.choice(vocab_dim, max_test_words, replace=False) #Choose random words from vocab
-print([max_test_words, vocab_dim])
-distance_matrix = np.empty([max_test_words, vocab_dim])
 
 #Calculate Euclidean distance between word vectors
-for i in range(max_test_words):
-	test_word = weights[test_word_indices[i]]
+def print_closest(wordvec, max_closest=2):
+	myheap = [(-sys.maxsize, -sys.maxsize)] * max_closest
+	heapq.heapify(myheap)
 	for j in range(vocab_dim):
-		distance_matrix[i,j] = np.linalg.norm(test_word - weights[j])
+		heapq.heappushpop(myheap, (-np.linalg.norm(wordvec - weights[j]), j))
 
-sorted_indices = np.argsort(distance_matrix, axis=1)
+	closest_words = heapq.nlargest(max_closest, myheap)
+	for i in range(len(closest_words)):
+		wordtuple = closest_words[i]
+		if wordtuple[1] == -1:
+			continue
+		print('{}'.format(id2token[wordtuple[1]]), end='')
+		if i < len(closest_words)-1:
+			print(', ', end='')
 
-#Save the result in file
-with open('word2vec_test_results.txt', 'a+') as f:
-	for i in range(max_test_words):
-		words = get_closest_words(sorted_indices, token2id, i, max_closest_words)
-		#f.write("\n{0} --> ".format(get_token(token2id, test_word_indices[i])))
-		f.write("\n{0} --> ".format(id2token[test_word_indices[i]]))
-		for j in range(max_closest_words):
-			f.write("{0}, ".format(words[j]))
+def interactive_mode():
+	qw = ''
 
+	while qw != 'exit':
+		try:
+			qw = input('Type a word: ');
+		except EOFError as err:
+			print('exit')
+			break
+
+		allwords = qw.split('+')
+
+		if any([(word not in token2id) for word in allwords]):
+			print('One of those words is not vectorized.')
+			continue
+
+		total_wordvec = np.zeros_like(weights[0], dtype=np.float32)
+		for word in allwords:
+			word_id = token2id[word]
+			total_wordvec += np.array(weights[word_id], dtype=np.float32)
+
+		print('{} ->  '.format(qw), end='')
+		print_closest(total_wordvec, max_closest_words)
+		print()
+
+
+def random_mode():
+	for i in range(20):
+		word_id = np.random.randint(low=0,high=vocab_dim)
+		word_vec = weights[word_id]
+		print('{} ->  '.format(id2token[word_id]), end='')
+		print_closest(word_vec, max_closest_words)
+		print()
+		
+
+
+if __name__ == '__main__':
+	if '--random-words' in sys.argv:
+		random_mode()
+	else:
+		interactive_mode()
 
