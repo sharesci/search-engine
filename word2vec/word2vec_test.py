@@ -32,6 +32,9 @@ training_data = pickle.load(open('tmp_textdata.pickle', 'rb'))
 token2id = training_data.token2id
 id2token = {v: k for k, v in token2id.items()}
 
+# Reduce memory usage by deleting the unused full text
+training_data.text_as_id_list = []
+
 
 #Calculate Euclidean distance between word vectors
 def print_closest(wordvec, max_closest=2):
