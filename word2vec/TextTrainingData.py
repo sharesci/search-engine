@@ -62,19 +62,23 @@ class TextTrainingData:
 		for k in self._infrequent_tokens:
 			all_indexes.extend(self._infrequent_tokens[k])
 
-		all_indexes = sorted(all_indexes)
-
-		new_text_id_list = []
-		for i in range(len(all_indexes)):
-			if i < len(all_indexes)-1:
-				new_text_id_list.extend(self.text_as_id_list[all_indexes[i]+1:all_indexes[i+1]])
-			else:
-				new_text_id_list.extend(self.text_as_id_list[all_indexes[i]+1:])
-			#del self.text_as_id_list[index]
-
-		self.text_as_id_list = new_text_id_list
+		self.text_as_id_list = self.remove_indexes(all_indexes)
 
 		num_infrequent = len(self._infrequent_tokens.keys())
 		self._infrequent_tokens = {}
 
 		return len(all_indexes), num_infrequent
+
+
+	def remove_indexes(self, index_list):
+		index_list = sorted(index_list)
+
+		new_text_id_list = []
+		for i in range(len(index_list)):
+			if i < len(index_list)-1:
+				new_text_id_list.extend(self.text_as_id_list[index_list[i]+1:index_list[i+1]])
+			else:
+				new_text_id_list.extend(self.text_as_id_list[index_list[i]+1:])
+
+		return new_text_id_list
+

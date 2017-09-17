@@ -73,9 +73,32 @@ def create_model(input_vector, label_vector, freq_list, vocab_dim, hidden_dim):
 
 	return cross_entropy_with_sampled_softmax(hidden_vector, label_vector, vocab_dim, hidden_dim, num_of_samples, sampling_weights)
 
+def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
+	total_freq = sum(text_training_data.id2freq)
+	normalized_id2freq = np.array(text_training_data.id2freq, dtype=np.float64) / total_freq
+
+	text = text_training_data.text_as_id_list
+	indexes_to_remove = []
+
+	for i in range(len(text)):
+		word_id = text[i]
+		removal_prob = 1 - np.sqrt(subsampling / normalized_id2freq[word_id])
+		if np.random.random() < removal_prob:
+			indexes_to_remove.append(i)
+		if i % prog_freq == 0:
+			print('Processed {} ({:0.3f}%) so far. {} words for removal ({:0.1f}%).'.format(i, 100.0*i/len(text), len(indexes_to_remove), 100.0*len(indexes_to_remove)/(i+1)))
+
+	print('Processing {} word removals ({:0.2f}%)...'.format(len(indexes_to_remove), 100.0*len(indexes_to_remove)/len(text)))
+	text_training_data.text_as_id_list = text_training_data.remove_indexes(indexes_to_remove)
+
+
 def train():
 	#training_data = pickle.load(open('tmp_textdata.pickle', 'rb'))
+	print('Unpickling data (this could take a short while)')
 	training_data = pickle.load(open('/dev/shm/tmp194_arxiv.pickle', 'rb'))
+	print('Preprocessing data (this could take a LONG while)...')
+	do_subsampling(training_data, subsampling=4e-5, prog_freq=1e7)
+	print('Preprocessing is done. Final # of training words: {}'.format(len(training_data.text_as_id_list)))
 	mb_source = WordMinibatchSource(training_data, max_window_size)
 	mb_num_samples = 128
 	mb_size = minibatch_size_schedule(mb_num_samples)
