@@ -8,7 +8,7 @@ import os
 datasource = 'arxiv'
 
 
-data = TextTrainingData(min_word_freq=6)
+data = TextTrainingData(min_word_freq=5)
 
 
 if datasource == 'cranfield':

@@ -2,7 +2,7 @@ import cntk as C
 import numpy as np
 
 class WordMinibatchSource(C.io.UserMinibatchSource):
-	def __init__(self, text_training_data, max_window_size):
+	def __init__(self, text_training_data, max_window_size=2):
 		self.text_training_data = text_training_data
 		self.max_window_size = max_window_size
 
@@ -19,8 +19,10 @@ class WordMinibatchSource(C.io.UserMinibatchSource):
 
 		super(WordMinibatchSource, self).__init__()
 
+
 	def stream_infos(self):
 		return [self.fsi, self.lsi]
+
 
 	def next_minibatch(self, num_samples, number_of_workers=1, worker_rank=0, device=None):
 		# Note that in this example we do not yet make use of number_of_workers or

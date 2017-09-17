@@ -16,7 +16,7 @@ allow_duplicates = False
 learning_rate = 0.0025
 clipping_threshold_per_sample = 5.0
 num_epochs = 10
-max_window_size = 3
+max_window_size = 2
 
 def cross_entropy_with_sampled_softmax(
     hidden_vector,          
