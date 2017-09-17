@@ -93,9 +93,8 @@ def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
 
 
 def train():
-	#training_data = pickle.load(open('tmp_textdata.pickle', 'rb'))
 	print('Unpickling data (this could take a short while)')
-	training_data = pickle.load(open('/dev/shm/tmp194_arxiv.pickle', 'rb'))
+	training_data = pickle.load(open('tmp_textdata.pickle', 'rb'))
 	print('Preprocessing data (this could take a LONG while)...')
 	do_subsampling(training_data, subsampling=4e-5, prog_freq=1e7)
 	print('Preprocessing is done. Final # of training words: {}'.format(len(training_data.text_as_id_list)))
