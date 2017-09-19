@@ -1,0 +1,3 @@
+# Ignore everything except this file (keep this directory empty for big data)
+*
+!.gitignore
