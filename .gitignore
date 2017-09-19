@@ -1,0 +1,5 @@
+# Vim swapfiles
+*.swp
+
+# Directory for storing large files
+/largedata
