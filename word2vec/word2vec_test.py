@@ -21,7 +21,7 @@ def get_closest_words(sorted_indices, token2id, i, limit):
 	return words
 
 
-z = load_model(os.path.join(os.getcwd(), "word2vec_checkpoint"))
+z = load_model(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata', "word2vec_checkpoint"))
 weights = z.E.value
 vocab_dim = weights.shape[0]
 

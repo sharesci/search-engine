@@ -17,6 +17,7 @@ learning_rate = 0.0025
 clipping_threshold_per_sample = 5.0
 num_epochs = 10
 max_window_size = 2
+subsampling_rate = 4e-5
 
 def cross_entropy_with_sampled_softmax(
     hidden_vector,          
@@ -94,9 +95,9 @@ def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
 
 def train():
 	print('Unpickling data (this could take a short while)')
-	training_data = pickle.load(open('tmp_textdata.pickle', 'rb'))
+	training_data = pickle.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata', 'tmp_textdata.pickle'), 'rb'))
 	print('Preprocessing data (this could take a LONG while)...')
-	do_subsampling(training_data, subsampling=4e-5, prog_freq=1e7)
+	do_subsampling(training_data, subsampling=subsampling_rate, prog_freq=1e7)
 	print('Preprocessing is done. Final # of training words: {}'.format(len(training_data.text_as_id_list)))
 	mb_source = WordMinibatchSource(training_data, max_window_size)
 	mb_num_samples = 128
@@ -129,7 +130,7 @@ def train():
 
 	progress_printer = C.logging.ProgressPrinter(freq=200, tag='Training')
 	checkpoint_config = CheckpointConfig(frequency = 100000*mb_num_samples,
-                                           filename = os.path.join(os.getcwd(), "word2vec_checkpoint"),
+                                           filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata', "word2vec_checkpoint"),
                                            restore = False)
 
 	trainer = Trainer(z, (cross_entropy, error), [learner], progress_writers=[progress_printer])

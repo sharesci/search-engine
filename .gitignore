@@ -1,3 +1,5 @@
 # Vim swapfiles
 *.swp
 
+# Python runtime files
+__pycache__/

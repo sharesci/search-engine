@@ -38,5 +38,5 @@ elif datasource == 'arxiv':
 	print('Total text size in the end is {:d}'.format(len(data.text_as_id_list)))
 
 
-with open('tmp_textdata.pickle', 'wb') as f:
+with open('../largedata/tmp_textdata.pickle', 'wb') as f:
 	pickle.dump(data, f)
