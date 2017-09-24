@@ -52,7 +52,7 @@ def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
 		nWords = len(word_ids)
 		removal_probs = 1 - np.sqrt(subsampling / normalized_id2freq[word_ids])
 		indexes_to_remove.extend(np.where(np.random.random(size=nWords) < removal_probs)[0]+(i*batch_size))
-		if (i*batch_size) % prog_freq == 0:
+		if (i*batch_size) % prog_freq < batch_size:
 			print('Processed {} ({:0.3f}%) so far. {} words for removal ({:0.1f}%).'.format(i*batch_size, 100.0*i*batch_size/len(text), len(indexes_to_remove), 100.0*len(indexes_to_remove)/(i*batch_size+1)))
 
 	print('Processing {} word removals ({:0.2f}%)...'.format(len(indexes_to_remove), 100.0*len(indexes_to_remove)/len(text)))
