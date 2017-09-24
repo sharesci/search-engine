@@ -4,6 +4,7 @@ import pickle
 from TextTrainingData import TextTrainingData
 import json
 import os
+import numpy as np
 
 datasource = 'arxiv'
 
@@ -37,6 +38,13 @@ elif datasource == 'arxiv':
 	print('Total vocab size in the end is {:d}'.format(len(data.id2freq)))
 	print('Total text size in the end is {:d}'.format(len(data.text_as_id_list)))
 
+base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata')
 
-with open('../largedata/tmp_textdata.pickle', 'wb') as f:
+with open(os.path.join(base_dir, 'tmp_textdata.pickle'), 'wb') as f:
 	pickle.dump(data, f)
+
+with open(os.path.join(base_dir, 'id2freq.npy'), 'wb') as f:
+	np.save(f, np.asarray(data.id2freq, dtype=np.int64))
+
+with open(os.path.join(base_dir, 'token2id.pickle'), 'wb') as f:
+	pickle.dump(data.token2id, f)
