@@ -43,13 +43,17 @@ def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
 	text = text_training_data.text_as_id_list
 	indexes_to_remove = []
 
-	for i in range(len(text)):
-		word_id = text[i]
-		removal_prob = 1 - np.sqrt(subsampling / normalized_id2freq[word_id])
-		if np.random.random() < removal_prob:
-			indexes_to_remove.append(i)
-		if i % prog_freq == 0:
-			print('Processed {} ({:0.3f}%) so far. {} words for removal ({:0.1f}%).'.format(i, 100.0*i/len(text), len(indexes_to_remove), 100.0*len(indexes_to_remove)/(i+1)))
+	# Use batching to let Numpy vectorize and improve performance
+	# This is over 5x faster comparted to without batching
+	batch_size = 5000
+
+	for i in range(len(text)//batch_size):
+		word_ids = text[i*batch_size:i*batch_size+batch_size]
+		nWords = len(word_ids)
+		removal_probs = 1 - np.sqrt(subsampling / normalized_id2freq[word_ids])
+		indexes_to_remove.extend(np.where(np.random.random(size=nWords) < removal_probs)[0]+(i*batch_size))
+		if (i*batch_size) % prog_freq == 0:
+			print('Processed {} ({:0.3f}%) so far. {} words for removal ({:0.1f}%).'.format(i*batch_size, 100.0*i*batch_size/len(text), len(indexes_to_remove), 100.0*len(indexes_to_remove)/(i*batch_size+1)))
 
 	print('Processing {} word removals ({:0.2f}%)...'.format(len(indexes_to_remove), 100.0*len(indexes_to_remove)/len(text)))
 	text_training_data.text_as_id_list = text_training_data.remove_indexes(indexes_to_remove)
