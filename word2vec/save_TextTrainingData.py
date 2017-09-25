@@ -5,6 +5,12 @@ from TextTrainingData import TextTrainingData
 import json
 import os
 import numpy as np
+import sys
+from argparse import ArgumentParser
+
+parser = ArgumentParser()
+parser.add_argument('--paragraph2vec', dest='paragraph2vec', action='store_true', default=False)
+cmdargs = parser.parse_args(sys.argv[1:])
 
 datasource = 'arxiv'
 
@@ -27,20 +33,23 @@ elif datasource == 'arxiv':
 	i = 0
 	for filename in allfiles:
 		with open(filename, 'r') as f:
-			data.add_text(f.read())
+			if cmdargs.paragraph2vec:
+				data.add_text(f.read(), doc_name=filename)
+			else:
+				data.add_text(f.read())
 		if i % 1000 == 0:
 			print(i)
 		i += 1
 
-	print('Deleting infrequent tokens')
-	num_positions_deleted, num_tokens_deleted = data.purge_infrequent_tokens()
-	print('Deleted {:d} tokens and {:d} positions'.format(num_tokens_deleted, num_positions_deleted))
-	print('Total vocab size in the end is {:d}'.format(len(data.id2freq)))
-	print('Total text size in the end is {:d}'.format(len(data.text_as_id_list)))
+print('Deleting infrequent tokens')
+num_positions_deleted, num_tokens_deleted = data.purge_infrequent_tokens()
+print('Deleted {:d} tokens and {:d} positions'.format(num_tokens_deleted, num_positions_deleted))
+print('Total vocab size in the end is {:d}'.format(len(data.id2freq)))
+print('Total text size in the end is {:d}'.format(data.total_words()))
 
 base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata')
 
-with open(os.path.join(base_dir, 'tmp_textdata.pickle'), 'wb') as f:
+with open(os.path.join(base_dir, 'text_training_data.pickle'), 'wb') as f:
 	pickle.dump(data, f)
 
 with open(os.path.join(base_dir, 'id2freq.npy'), 'wb') as f:

@@ -30,7 +30,7 @@ class WordMinibatchSource(C.io.UserMinibatchSource):
 		# scenarios.
 		f_data = []
 		l_data = []
-		text = self.text_training_data.text_as_id_list
+		text = self.text_training_data.docs[0]
 
 		f_data.extend(self.leftover_features)
 		l_data.extend(self.leftover_labels)

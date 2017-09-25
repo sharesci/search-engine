@@ -8,9 +8,10 @@ import numpy as np
 class TextTrainingData:
 	def __init__(self, min_word_freq=2):
 		self._min_word_freq = min_word_freq
+		self.doc2id = {}
 		self.token2id = {}
 		self.id2freq = []
-		self.text_as_id_list = []
+		self.docs = []
 		self.token_regex = re.compile(r"(?u)\b\w+\b")
 
 		# We'll use this to keep track of positions of infrequent
@@ -19,24 +20,33 @@ class TextTrainingData:
 		self._infrequent_tokens = {}
 
 
-	def add_text(self, text):
-		token_list = self.token_regex.findall(text)
-		for token in token_list:
-			self._add_token(token)
+	def add_text(self, text, doc_name='_'):
+		if doc_name not in self.doc2id:
+			self.doc2id[doc_name] = len(self.docs)
+			self.docs.append([])
+		doc_id = self.doc2id[doc_name]
+
+		for token in self.token_regex.findall(text):
+			self._add_token(token, doc_id)
 
 
-	def _add_token(self, token):
+	def _add_token(self, token, doc_id):
+		text_id_list = self.docs[doc_id]
 		if token in self.token2id:
 			token_id = self.token2id[token]
 			self.id2freq[token_id] += 1
-			self.text_as_id_list.append(token_id)
+			text_id_list.append(token_id)
+
+			# Important to return here; otherwise the token will be
+			# added back to the infrequent_tokens list and possibly
+			# deleted
 			return
 
 		if token not in self._infrequent_tokens:
 			self._infrequent_tokens[token] = []
 
-		self._infrequent_tokens[token].append(len(self.text_as_id_list))
-		self.text_as_id_list.append(-1)
+		self._infrequent_tokens[token].append((doc_id, len(text_id_list)))
+		text_id_list.append(-1)
 
 		# Once we have enough appearances, make this a real token
 		if len(self._infrequent_tokens[token]) == self._min_word_freq:
@@ -45,11 +55,14 @@ class TextTrainingData:
 			self.id2freq.append(len(self._infrequent_tokens[token]))
 
 			# Fill in the placeholders with the real id
-			for index in self._infrequent_tokens[token]:
-				self.text_as_id_list[index] = token_id
+			for doc_id2, index in self._infrequent_tokens[token]:
+				self.docs[doc_id2][index] = token_id
 
 			self._infrequent_tokens.pop(token, None)
 
+
+	def total_words(self):
+		return sum([len(self.docs[i]) for i in range(len(self.docs))])
 
 
 	## Get rid of all references to infrequent tokens
@@ -58,27 +71,37 @@ class TextTrainingData:
 	# temporary infrequent token dict
 	#
 	def purge_infrequent_tokens(self):
-		all_indexes = []
+		# Make sure this is a list comprehension and not something like
+		# [[]], or all elements will reference the same list
+		all_indexes = [list() for i in range(len(self.docs))]
 		for k in self._infrequent_tokens:
-			all_indexes.extend(self._infrequent_tokens[k])
+			for item in self._infrequent_tokens[k]:
+				all_indexes[item[0]].append(item[1])
 
-		self.text_as_id_list = self.remove_indexes(all_indexes)
+		for i in range(len(all_indexes)):
+			self.docs[i] = TextTrainingData.remove_indexes(self.docs[i], all_indexes[i])
 
 		num_infrequent = len(self._infrequent_tokens.keys())
 		self._infrequent_tokens = {}
 
-		return len(all_indexes), num_infrequent
+		return sum([len(d) for d in all_indexes]), num_infrequent
 
 
-	def remove_indexes(self, index_list):
+	## Removes the elements at the indexes specified in index_list from
+	# main_list
+	#
+	def remove_indexes(main_list, index_list):
+		if len(index_list) == 0:
+			return main_list[:]
+
 		index_list = sorted(index_list)
 
-		new_text_id_list = []
+		new_list = main_list[:index_list[0]]
 		for i in range(len(index_list)):
 			if i < len(index_list)-1:
-				new_text_id_list.extend(self.text_as_id_list[index_list[i]+1:index_list[i+1]])
+				new_list.extend(main_list[index_list[i]+1:index_list[i+1]])
 			else:
-				new_text_id_list.extend(self.text_as_id_list[index_list[i]+1:])
+				new_list.extend(main_list[index_list[i]+1:])
 
-		return new_text_id_list
+		return new_list
 

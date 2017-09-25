@@ -5,7 +5,7 @@ import os
 
 from SampledSoftmax import cross_entropy_with_sampled_softmax
 from TextTrainingData import TextTrainingData
-from WordMinibatchSource import WordMinibatchSource
+from ParagraphMinibatchSource import ParagraphMinibatchSource
 from cntk.train import Trainer
 from cntk.learners import sgd, learning_rate_schedule, UnitType
 from cntk.train.training_session import CheckpointConfig, training_session, minibatch_size_schedule
@@ -18,24 +18,41 @@ allow_duplicates = False
 learning_rate = 0.0025
 clipping_threshold_per_sample = 5.0
 num_epochs = 10
-max_window_size = 2
+context_size = 3
 subsampling_rate = 4e-5
 
 
-def create_inputs(vocab_dim):
-	input_vector = C.ops.input_variable(vocab_dim, np.float32, is_sparse=True)
+## Note the order of inputs to match the order of streams in
+# ParagraphMinibatchSource: [Label, DocId, ContextWords...]
+def create_inputs(vocab_dim, num_docs):
+	inputs = []
 	label_vector = C.ops.input_variable(vocab_dim, np.float32, is_sparse=True)
-	return input_vector, label_vector
+	docid_vector = C.ops.input_variable(num_docs, np.float32, is_sparse=True)
+	input_word_vectors = [C.ops.input_variable(vocab_dim, np.float32, is_sparse=True) for i in range(context_size)]
+	return [label_vector, docid_vector] + input_word_vectors
 
-def create_model(input_vector, label_vector, freq_list, vocab_dim, hidden_dim):
+def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 
-	hidden_vector = C.layers.Embedding(hidden_dim)(input_vector)
-	#hidden_vector = C.times(input_vector, weights1) + bias1
+	z = C.load_model(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata', "word2vec_checkpoint"))
+
+	word_embedding_type = C.layers.Embedding(weights=z.E.value)
+
+	doc_embedding = C.layers.Embedding(hidden_dim)(input_list[1])
+
+	# Free some memory
+	z = None
+
+	word_embeddings = []
+	for i in range(context_size):
+		word_embeddings.append(word_embedding_type(input_list[i+2]))
+
+	all_embeddings = [doc_embedding] + word_embeddings
+	middle_layer = C.ops.splice(*all_embeddings, axis=0)
 
 	smoothed_weights = np.float32(np.power(freq_list, alpha))
 	sampling_weights = C.reshape(C.Constant(smoothed_weights), shape = (1,vocab_dim))
 
-	return cross_entropy_with_sampled_softmax(hidden_vector, label_vector, vocab_dim, hidden_dim, num_of_samples, sampling_weights)
+	return cross_entropy_with_sampled_softmax(middle_layer, input_list[0], vocab_dim, hidden_dim*len(all_embeddings), num_of_samples, sampling_weights)
 
 def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
 	total_freq = sum(text_training_data.id2freq)
@@ -57,29 +74,30 @@ def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
 			print('Processed {} ({:0.3f}%) so far. {} words for removal ({:0.1f}%).'.format(i*batch_size, 100.0*i*batch_size/len(text), len(indexes_to_remove), 100.0*len(indexes_to_remove)/(i*batch_size+1)))
 
 	print('Processing {} word removals ({:0.2f}%)...'.format(len(indexes_to_remove), 100.0*len(indexes_to_remove)/len(text)))
-	text_training_data.docs[0] = TextTrainingData.remove_indexes(text_training_data.docs[0], indexes_to_remove)
+	text_training_data.docs[0] = TextTrainingData.remove_indexes(indexes_to_remove)
 
 
 def train():
 	print('Unpickling data (this could take a short while)')
-	training_data = pickle.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata', 'tmp_textdata.pickle'), 'rb'))
-	print('Preprocessing data (this could take a LONG while)...')
-	do_subsampling(training_data, subsampling=subsampling_rate, prog_freq=1e7)
-	print('Preprocessing is done. Final # of training words: {}'.format(len(training_data.docs[0])))
-	mb_source = WordMinibatchSource(training_data, max_window_size)
+	training_data = pickle.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata', 'text_training_data.pickle'), 'rb'))
+	#print('Preprocessing data (this could take a LONG while)...')
+	#do_subsampling(training_data, subsampling=subsampling_rate, prog_freq=1e7)
+	print('Preprocessing is done. Final # of training words: {}'.format(training_data.total_words()))
+	mb_source = ParagraphMinibatchSource(training_data, context_size)
 	mb_num_samples = 128
 	mb_size = minibatch_size_schedule(mb_num_samples)
 
 	freq_list = training_data.id2freq
 	token2id = training_data.token2id
 	vocab_dim = len(freq_list)
+	num_docs = len(training_data.docs)
 	print(vocab_dim)
-	input_vector, label_vector = create_inputs(vocab_dim)
+	input_list = create_inputs(vocab_dim, num_docs)
 
-	z, cross_entropy, error = create_model(input_vector, label_vector, freq_list, vocab_dim, hidden_dim) 
+	z, cross_entropy, error = create_model(input_list, freq_list, vocab_dim, hidden_dim) 
 
 	lr_schedule = learning_rate_schedule(learning_rate, UnitType.sample)
-	lr_schedule2 = learning_rate_schedule([(3e-3)*(0.8**i) for i in range(10)], UnitType.sample, epoch_size=len(training_data.docs[0])//2)
+	lr_schedule2 = learning_rate_schedule([(3e-3)*(0.8**i) for i in range(10)], UnitType.sample, epoch_size=training_data.total_words()//2)
 	mom_schedule = C.learners.momentum_schedule(0.005, UnitType.sample)
 	gradient_clipping_with_truncation = True
 	learner = C.learners.sgd(z.parameters, lr=lr_schedule2,
@@ -102,10 +120,14 @@ def train():
 
 	trainer = Trainer(z, (cross_entropy, error), [learner], progress_writers=[progress_printer])
 	
-	input_map = { input_vector: mb_source.fsi, label_vector: mb_source.lsi }	
+	input_streams = mb_source.stream_infos()
+	input_map = {}# input_vector: mb_source.fsi, label_vector: mb_source.lsi }	
+	for i in range(len(input_list)):
+		input_map[input_list[i]] = input_streams[i]
 
-	session = training_session(trainer, mb_source, mb_size, input_map, progress_frequency=len(training_data.docs[0]), max_samples = None, checkpoint_config=checkpoint_config, cv_config=None, test_config=None)
+	session = training_session(trainer, mb_source, mb_size, input_map, progress_frequency=training_data.total_words(), max_samples = None, checkpoint_config=checkpoint_config, cv_config=None, test_config=None)
 	
 	C.logging.log_number_of_parameters(z) ; print()
 	session.train()
 train()
+
