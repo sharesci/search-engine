@@ -2,7 +2,9 @@ import cntk as C
 import numpy as np
 import pickle
 import os
+import sys
 
+from argparse import ArgumentParser
 from SampledSoftmax import cross_entropy_with_sampled_softmax
 from TextTrainingData import TextTrainingData
 from ParagraphMinibatchSource import ParagraphMinibatchSource
@@ -11,15 +13,24 @@ from cntk.learners import sgd, learning_rate_schedule, UnitType
 from cntk.train.training_session import CheckpointConfig, training_session, minibatch_size_schedule
 
 
-hidden_dim = 300
+hidden_dim = 250
 alpha = 0.75
 num_of_samples = 15
 allow_duplicates = False
 learning_rate = 0.0025
 clipping_threshold_per_sample = 5.0
 num_epochs = 10
-context_size = 3
+context_size = 2
 subsampling_rate = 4e-5
+
+
+parser = ArgumentParser()
+parser.add_argument('--word_embedding_file', dest='word_embedding_file', action='store', default='')
+parser.add_argument('--train_word_embeddings', dest='train_word_embeddings', action='store_true', default=False)
+parser.add_argument('--doc_embedding_init_file', dest='doc_embedding_init_file', action='store', default='')
+parser.add_argument('--output_weights_init_file', dest='output_weights_init_file', action='store', default='')
+parser.add_argument('--output_bias_init_file', dest='output_bias_init_file', action='store', default='')
+cmdargs = parser.parse_args(sys.argv[1:])
 
 
 ## Note the order of inputs to match the order of streams in
@@ -33,14 +44,32 @@ def create_inputs(vocab_dim, num_docs):
 
 def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 
-	z = C.load_model(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata', "word2vec_checkpoint"))
+	# Word embedding layers init
+	word_embedding_type = None
+	if cmdargs.word_embedding_file == '':
+		word_embedding_type = C.layers.Embedding(hidden_dim)
+	else:
+		word_embeddings = None
+		with open(cmdargs.word_embedding_file, 'rb') as f:
+			word_embeddings = np.load(f)
+		if cmdargs.train_word_embeddings:
+			word_embedding_type = C.layers.Embedding(hidden_dim, init=word_embeddings)
+		else:
+			print(word_embeddings.shape)
+			word_embedding_type = C.layers.Embedding(weights=word_embeddings)
 
-	word_embedding_type = C.layers.Embedding(weights=z.E.value)
+	# Document embedding layer init
+	doc_embedding = None
+	if cmdargs.doc_embedding_init_file == '':
+		doc_embedding = C.layers.Embedding(hidden_dim)(input_list[1])
+	else:
+		doc_embeddings_init = None
+		with open(cmdargs.doc_embedding_init_file, 'rb') as f:
+			doc_embeddings_init = np.load(f)
+		doc_embedding = C.layers.Embedding(hidden_dim, init=doc_embeddings_init)(input_list[1])
 
 	doc_embedding = C.layers.Embedding(hidden_dim)(input_list[1])
 
-	# Free some memory
-	z = None
 
 	word_embeddings = []
 	for i in range(context_size):
@@ -52,7 +81,17 @@ def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 	smoothed_weights = np.float32(np.power(freq_list, alpha))
 	sampling_weights = C.reshape(C.Constant(smoothed_weights), shape = (1,vocab_dim))
 
-	return cross_entropy_with_sampled_softmax(middle_layer, input_list[0], vocab_dim, hidden_dim*len(all_embeddings), num_of_samples, sampling_weights)
+	output_weights_init = C.initializer.glorot_uniform()
+	output_bias_init = 0
+	if cmdargs.output_weights_init_file != '':
+		with open(cmdargs.output_weights_init_file, 'rb') as f:
+			output_weights_init = np.load(f)
+	if cmdargs.output_bias_init_file != '':
+		with open(cmdargs.output_bias_init_file, 'rb') as f:
+			output_bias_init = np.load(f)
+
+	return cross_entropy_with_sampled_softmax(middle_layer, input_list[0], vocab_dim, hidden_dim*len(all_embeddings), num_of_samples, sampling_weights, weights_init = output_weights_init, bias_init = output_bias_init)
+
 
 def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
 	total_freq = sum(text_training_data.id2freq)
@@ -121,7 +160,7 @@ def train():
 	trainer = Trainer(z, (cross_entropy, error), [learner], progress_writers=[progress_printer])
 	
 	input_streams = mb_source.stream_infos()
-	input_map = {}# input_vector: mb_source.fsi, label_vector: mb_source.lsi }	
+	input_map = {}
 	for i in range(len(input_list)):
 		input_map[input_list[i]] = input_streams[i]
 

@@ -8,11 +8,13 @@ def cross_entropy_with_sampled_softmax(
     hidden_dim,             
     num_samples,            
     sampling_weights,       
-    allow_duplicates = False 
+    allow_duplicates = False,
+    weights_init = C.initializer.glorot_uniform(),
+    bias_init = 0
     ):
 
-	bias = C.layers.Parameter(shape = (vocab_dim, 1), init = 0)
-	weights = C.layers.Parameter(shape = (vocab_dim, hidden_dim), init = C.initializer.glorot_uniform())
+	bias = C.layers.Parameter(shape = (vocab_dim, 1), init = bias_init)
+	weights = C.layers.Parameter(shape = (vocab_dim, hidden_dim), init = weights_init)
 
 	sample_selector_sparse = C.random_sample(sampling_weights, num_samples, allow_duplicates)
 	sample_selector = sample_selector_sparse

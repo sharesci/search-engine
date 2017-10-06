@@ -41,6 +41,9 @@ class ParagraphMinibatchSource(C.io.UserMinibatchSource):
 
 		docid = np.random.randint(low=0, high=len(docs))
 		doc = docs[docid]
+		while len(doc) < self.context_size+2:
+			docid = np.random.randint(low=0, high=len(docs))
+			doc = docs[docid]
 		docid_data = [docid] * num_samples
 		
 		offsets = np.random.randint(low=0, high=len(doc)-self.context_size-1, size=num_samples)
