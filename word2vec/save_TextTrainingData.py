@@ -34,7 +34,7 @@ elif datasource == 'arxiv':
 	for filename in allfiles:
 		with open(filename, 'r') as f:
 			if cmdargs.paragraph2vec:
-				data.add_text(f.read(), doc_name=filename)
+				data.add_text(f.read(), doc_name=os.path.basename(filename))
 			else:
 				data.add_text(f.read())
 		if i % 1000 == 0:
