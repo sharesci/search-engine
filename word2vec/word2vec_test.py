@@ -1,42 +1,26 @@
-import cntk as C
-from cntk.ops.functions import load_model
 import os
 import pickle
 import numpy as np
 import heapq
 import sys
+import json
 
 # This script gets the nearest neighbors of the word entered at the prompt.
 # Run with --random-words to get the old behavior of selecting a group of
 # random words instead of prompting.
 
-def get_token(token2id, token_id):
-	return list(token2id.keys())[list(token2id.values()).index(token_id)]
-
-def get_closest_words(sorted_indices, token2id, i, limit):
-	words = []
-	for j in range(limit):
-		words.append(get_token(token2id, sorted_indices[i][j]))
-	
-	return words
-
-
-z = load_model(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata', "word2vec_checkpoint"))
-weights = z.E.value
+with open('../largedata/word2vec_vectors.npy', 'rb') as f:
+	weights = np.load(f)
 vocab_dim = weights.shape[0]
 
-max_test_words = 20#vocab_dim
-max_closest_words = 10
+max_test_words = 20
+max_closest_words = 20
 
-training_data = pickle.load(open('tmp_textdata.pickle', 'rb'))
-token2id = training_data.token2id
+with open('../largedata/token2id.json', 'r') as f:
+	token2id = json.load(f)
 id2token = {v: k for k, v in token2id.items()}
 
-# Reduce memory usage by deleting the unused full text
-training_data.text_as_id_list = []
-
-
-#Calculate Euclidean distance between word vectors
+# Calculate Euclidean distance between word vectors
 def print_closest(wordvec, max_closest=2):
 	myheap = [(-sys.maxsize, -sys.maxsize)] * max_closest
 	heapq.heapify(myheap)
