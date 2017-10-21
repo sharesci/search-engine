@@ -57,3 +57,6 @@ with open(os.path.join(base_dir, 'id2freq.npy'), 'wb') as f:
 
 with open(os.path.join(base_dir, 'token2id.pickle'), 'wb') as f:
 	pickle.dump(data.token2id, f)
+
+with open(os.path.join(base_dir, 'token2id.json'), 'w') as f:
+	json.dump(data.token2id, f, indent=4, sort_keys=True)
