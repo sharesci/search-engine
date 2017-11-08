@@ -23,6 +23,7 @@ from scipy.sparse import linalg as LA
 from optparse import OptionParser
 import nltk
 from nltk.stem.porter import PorterStemmer
+import json
 
 stemmer = PorterStemmer(mode=PorterStemmer.MARTIN_EXTENSIONS)
 
@@ -299,7 +300,7 @@ effect if --new-docs is also specified
     if OPTIONS.doc_dir and OPTIONS.mapping_file:
         mappings = [[], []]
         with open(OPTIONS.mapping_file) as f:
-            for m in eval(f.readline()):
+            for m in json.load(f):
                 mappings[0].append(m["arXiv_id"])
                 mappings[1].append(m["_id"])
 
