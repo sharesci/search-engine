@@ -59,16 +59,36 @@ def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 	word_embedding_type = None
 	if cmdargs.word_embedding_method == 'rcnn':
 		# Embed using recurrent character-level convolutions over the input
+
+		# Placeholder for the input char codes
 		window_input = C.ops.placeholder(cmdargs.rcnn_filter_width)
+
+		# Reuse weights when embedding each char
+		char_embedding_type = C.layers.Embedding(48)
+
+		# Split up the list of char codes into individual characters so
+		# we can embed each one
 		char_embeds_list = []
 		for i in range(cmdargs.rcnn_filter_width):
 			char_input = C.ops.slice(window_input, 0, i, i+1)
 			onehot_embedding = C.ops.one_hot(char_input, 256, sparse_output=True)
-			char_embeds_list.append(C.layers.Embedding(48)(onehot_embedding))
+			char_embeds_list.append(char_embedding_type(onehot_embedding))
+		# Put the individual characters back together
 		char_embeds = C.ops.splice(*char_embeds_list)
+
+		# Do some initial Dense layers to process each frame
+		# This is called sliding_conv because each one is called on
+		# just rcnn_filter_width characters for each element of the
+		# sequence, as the filter "slides" (via LSTM) across the whole
+		# input string
 		sliding_conv1 = C.layers.Dense(32, activation=C.ops.tanh)(char_embeds)
 		sliding_conv2 = C.layers.Dense(32, activation=C.ops.tanh)(sliding_conv1)
+
+		# Collect the Dense outputs for the sequence together into a single vector
 		lstm1 = C.layers.Fold(C.layers.LSTM(96))(sliding_conv2)
+
+		# Finally, use a Dense layer to adjust the output size to be
+		# hidden_dim and use this as the word embedding
 		word_embedding_type = C.layers.Dense(hidden_dim, name="word_embed")(lstm1)
 	elif cmdargs.word_embedding_method == 'lookup' and cmdargs.word_embedding_file != '':
 		# Embed using a lookup table (CNTK "Embedding" layer)
@@ -119,36 +139,11 @@ def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 	return cross_entropy_with_sampled_softmax(middle_layer, input_list[0], vocab_dim, hidden_dim*len(all_embeddings), num_of_samples, sampling_weights, weights_init = output_weights_init, bias_init = output_bias_init)
 
 
-def do_subsampling(text_training_data, subsampling=1e-5, prog_freq=1e8):
-	total_freq = sum(text_training_data.id2freq)
-	normalized_id2freq = np.array(text_training_data.id2freq, dtype=np.float64) / total_freq
-
-	text = text_training_data.docs[0]
-	indexes_to_remove = []
-
-	# Use batching to let Numpy vectorize and improve performance
-	# This is over 5x faster comparted to without batching
-	batch_size = 5000
-
-	for i in range(len(text)//batch_size):
-		word_ids = text[i*batch_size:i*batch_size+batch_size]
-		nWords = len(word_ids)
-		removal_probs = 1 - np.sqrt(subsampling / normalized_id2freq[word_ids])
-		indexes_to_remove.extend(np.where(np.random.random(size=nWords) < removal_probs)[0]+(i*batch_size))
-		if (i*batch_size) % prog_freq < batch_size:
-			print('Processed {} ({:0.3f}%) so far. {} words for removal ({:0.1f}%).'.format(i*batch_size, 100.0*i*batch_size/len(text), len(indexes_to_remove), 100.0*len(indexes_to_remove)/(i*batch_size+1)))
-
-	print('Processing {} word removals ({:0.2f}%)...'.format(len(indexes_to_remove), 100.0*len(indexes_to_remove)/len(text)))
-	text_training_data.docs[0] = TextTrainingData.remove_indexes(indexes_to_remove)
-
-
 def train():
 	print('Unpickling training data (this could take a short while)')
 	with open(cmdargs.training_data_file, 'rb') as f:
 		training_data = pickle.load(f)
-	#print('Preprocessing data (this could take a LONG while)...')
-	#do_subsampling(training_data, subsampling=subsampling_rate, prog_freq=1e7)
-	print('Preprocessing is done. Final # of training words: {}'.format(training_data.total_words()))
+	print('Done unpickling. Final # of training words: {}'.format(training_data.total_words()))
 
 	freq_list = training_data.id2freq
 	token2id = training_data.token2id
@@ -158,6 +153,7 @@ def train():
 
 	input_list = create_inputs(vocab_dim, num_docs)
 
+	mb_source = None
 	if cmdargs.word_embedding_method == 'rcnn':
 		mb_source = RcnnParagraphMinibatchSource(training_data, {v:k for k,v in token2id.items()}, input_list, cmdargs.rcnn_filter_width, context_size)
 	elif cmdargs.word_embedding_method == 'lookup':
@@ -204,5 +200,8 @@ def train():
 	
 	C.logging.log_number_of_parameters(z) ; print()
 	session.train()
-train()
+
+
+if __name__ == '__main__':
+	train()
 
