@@ -10,22 +10,20 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser()
 parser.add_argument('--paragraph2vec', dest='paragraph2vec', action='store_true', default=False)
+parser.add_argument('--data_source_type', dest='data_source_type', action='store', type=str, default='arxiv')
 cmdargs = parser.parse_args(sys.argv[1:])
-
-datasource = 'arxiv'
 
 
 data = TextTrainingData(min_word_freq=5)
 
-
-if datasource == 'cranfield':
+if cmdargs.data_source_type == 'cranfield':
 	with open('../cranfield_data/cran.json', 'r') as f:
 		cran_data = json.load(f)
 
 	for doc in cran_data:
 		data.add_text(doc['W'])
 	
-elif datasource == 'arxiv':
+elif cmdargs.data_source_type == 'arxiv':
 	allfiles = []
 	for root, dirs, files in os.walk('/mnt/data_partition/sharesci/arxiv/preproc/tmp/'):
 		allfiles.extend([root+name for name in files])
@@ -54,9 +52,6 @@ with open(os.path.join(base_dir, 'text_training_data.pickle'), 'wb') as f:
 
 with open(os.path.join(base_dir, 'id2freq.npy'), 'wb') as f:
 	np.save(f, np.asarray(data.id2freq, dtype=np.int64))
-
-with open(os.path.join(base_dir, 'token2id.pickle'), 'wb') as f:
-	pickle.dump(data.token2id, f)
 
 with open(os.path.join(base_dir, 'token2id.json'), 'w') as f:
 	json.dump(data.token2id, f, indent=4, sort_keys=True)
