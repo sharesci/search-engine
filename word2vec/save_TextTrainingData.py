@@ -1,5 +1,16 @@
 #!/usr/bin/python3
 
+## @file
+#
+# This script preprocesses a data source and pickles it as a TextTrainingData
+# class. In addition, the token2id and id2freq from the TextTrainingData are
+# saved separately so they can be accessed without loading all the data into
+# RAM.
+#
+# EXAMPLES:
+#
+# Prepare arXiv data
+
 import pickle
 from TextTrainingData import TextTrainingData
 import json
@@ -10,8 +21,19 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser()
 parser.add_argument('--paragraph2vec', dest='paragraph2vec', action='store_true', default=False)
-parser.add_argument('--data_source_type', dest='data_source_type', action='store', type=str, default='arxiv')
+parser.add_argument('--data_source_type', dest='data_source_type', action='store', type=str, choices=['arxiv', 'cranfield'], default='arxiv')
+parser.add_argument('--data_location', dest='data_location', action='store', type=str, default='')
 cmdargs = parser.parse_args(sys.argv[1:])
+
+base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata')
+
+default_data_locations = {
+	'cranfield': os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'cranfield_data', 'cran.json'),
+	'arxiv': '/mnt/data_partition/sharesci/arxiv/preproc/tmp/'
+}
+data_location = cmdargs.data_location
+if data_location == '':
+	data_location = default_data_locations[cmdargs.data_source_type]
 
 
 data = TextTrainingData(min_word_freq=5)
@@ -22,7 +44,6 @@ if cmdargs.data_source_type == 'cranfield':
 
 	for doc in cran_data:
 		data.add_text(doc['W'])
-	
 elif cmdargs.data_source_type == 'arxiv':
 	allfiles = []
 	for root, dirs, files in os.walk('/mnt/data_partition/sharesci/arxiv/preproc/tmp/'):
@@ -45,7 +66,6 @@ print('Deleted {:d} tokens and {:d} positions'.format(num_tokens_deleted, num_po
 print('Total vocab size in the end is {:d}'.format(len(data.id2freq)))
 print('Total text size in the end is {:d}'.format(data.total_words()))
 
-base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata')
 
 with open(os.path.join(base_dir, 'text_training_data.pickle'), 'wb') as f:
 	pickle.dump(data, f)

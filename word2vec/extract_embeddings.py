@@ -110,8 +110,8 @@ def guess_model_type(model):
 if __name__ == '__main__':
 	parser = ArgumentParser()
 	parser.add_argument(dest='model_file', action='store', type=str, default='', help="The file containing the CNTK model")
-	parser.add_argument(dest='embedding_type', action='store', type=str, default='', help="The type of embedding to extract ('word' or 'doc')")
-	parser.add_argument('--model_type', dest='model_type', action='store', type=str, default='guess')
+	parser.add_argument(dest='embedding_type', action='store', type=str, default='', choices=['word', 'doc'], help="The type of embedding to extract")
+	parser.add_argument('--model_type', dest='model_type', action='store', type=str, choices=['guess', 'rcnn', 'lookup'], default='guess')
 	parser.add_argument('--token2id_file', dest='token2id_file', action='store', type=str, default='../largedata/token2id.json', help="JSON file mapping tokens to IDs")
 	parser.add_argument('--output_file', dest='output_file', action='store', type=str, default='')
 	cmdargs = parser.parse_args(sys.argv[1:])
