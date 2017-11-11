@@ -283,11 +283,15 @@ if __name__ == "__main__":
                       default=False,
                       action="store_true",
                       dest="get_parent_docs",
-                      help="""
-For each text doc id, assume the portion following the last '_' is the text doc
-id of the parent doc, and update the database accordingly. This only has an
-effect if --new-docs is also specified
-        """
+		      help="""For each text doc id, assume the portion
+			      following the last '_' is the text doc id of the
+			      parent doc, and update the database accordingly.
+			      This only has an effect if --new-docs is also
+			      specified.  This option typically is only used
+			      when the indexer is called from the
+			      index_metadata.py script, and it is unlikely you
+			      want to use it from the command line.
+                      """
                      )
 
     (OPTIONS, ARGS) = parser.parse_args()
