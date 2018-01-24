@@ -21,12 +21,14 @@ import version_check
 version_check.assert_min_version('3.5')
 
 import http.server
+from http import HTTPStatus
 import os
 import urllib.parse
 import io
 import numpy as np
 import json
 import sys
+from VectorizerDocSearchEngine import VectorizerDocSearchEngine
 
 class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 	def do_GET(self):
@@ -71,9 +73,17 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 	def _do_search_GET(self):
 		req_body = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
 
-		max_results = 10 if 'maxResults' not in req_body else req_body['maxResults']
+		if 'q' not in req_body:
+			response['status'] = HTTPStatus.UNPROCESSABLE_ENTITY  # code 422
+			response['body'] = {'errno': 1, 'errstr': 'Missing "q" parameter in GET querystring'}
+		else:
+			# TODO: Add error checking (e.g., if a param is not a valid int)
+			max_results = int(req_body['maxResults'][0]) if 'maxResults' in req_body else 0
+			offset = int(req_body['offset'][0]) if 'offset' in req_body else 0
+			getFullDocs = True if (('getFullDocs' in req_body) and (int(req_body['getFullDocs'][0]) == 1)) else False
 
-		response = self._do_qs_search(req_body['q'], max_results=max_results)
+			response = self._do_qs_search(req_body['q'][0], max_results=max_results, offset=offset, getFullDocs=getFullDocs)
+
 		response_body = json.dumps(response['body']).encode()
 
 		self.send_response(response['status'])
@@ -85,23 +95,20 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 		f.flush()
 
 
-	def _do_qs_search(self, query, max_results=0):
-		# TODO: Fill in the code to actually search
-		return {
-			'status': 200,
-			'body': {
-				"errno": 0,
-				"errstr": "string",
-				"numResults": 0,
-				"results": [
-					{
-						"_id": "string",
-						"documentJson": {},
-						"score": 0
-					}
-				]
-			}
+	def _do_qs_search(self, query, **kwargs):
+
+		search_results = self.server.search_engine.search_qs(query, **kwargs)
+		results_arr = [{'_id': r[1], 'score': r[0]} for r in search_results]
+
+		response = dict()
+		response['status'] = 200
+		response['body'] = {
+			'errno': 0,
+			'errstr': '',
+			'numResults': len(results_arr),
+			'results': results_arr
 		};
+		return response
 
 
 class SearchServer(http.server.HTTPServer):
@@ -119,7 +126,7 @@ if __name__ == '__main__':
 
 	# TODO: Add initializations for config_options and search_engine
 	config_options = None
-	search_engine = None
+	search_engine = VectorizerDocSearchEngine()
 
 	server = SearchServer(config_options, search_engine, ('', cmdargs.port), SearchRequestHandler)
 	server.serve_forever()
