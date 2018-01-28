@@ -24,13 +24,15 @@ from optparse import OptionParser
 import nltk
 from nltk.stem.porter import PorterStemmer
 import json
+import csv
 
 stemmer = PorterStemmer(mode=PorterStemmer.MARTIN_EXTENSIONS)
 
 DOC_TYPES_KEY = {
                     'title': 2,
                     'abstract': 3,
-                    'authors': 4
+                    'authors': 4,
+                    'wiki': 5
                 }
 
 CONN = psycopg2.connect("dbname='sharesci' user='sharesci' host='localhost' password='sharesci'")
@@ -301,12 +303,26 @@ if __name__ == "__main__":
         print("Database is too big! Can't fit more data within the limit!", file=sys.stderr)
         sys.exit(1)
 
-    if OPTIONS.doc_dir and OPTIONS.mapping_file:
+    #if OPTIONS.doc_dir and OPTIONS.mapping_file:
+    if OPTIONS.mapping_file:
         mappings = [[], []]
         with open(OPTIONS.mapping_file) as f:
-            for m in json.load(f):
-                mappings[0].append(m["arXiv_id"])
-                mappings[1].append(m["_id"])
+            for m in csv.reader(f):
+                mongoID = m[0]
+                if mongoID == "_id": continue
+                else: mongoID = m[0][9:-1]
+
+                docID = m[1]
+
+                mappings[0].append(mongoID)
+                mappings[1].append(docID)
+                # if 'arXiv_id' in m:
+                #     mappings[0].append(m["_id"])
+                #     mappings[1].append(m["arXiv_id"])
+                # elif 'id' in m:
+                #     mappings[0].append(m["_id"])
+                #     mappings[1].append(m["id"])
+
 
         token_dict = load_files(OPTIONS.doc_dir, mappings)
         index_terms(token_dict, OPTIONS)
