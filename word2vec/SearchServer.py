@@ -36,6 +36,8 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 		req_parts=urllib.parse.urlparse(self.path)
 		if req_parts.path == '/search':
 			self._do_search_GET()
+		elif req_parts.path == '/related-docs':
+			self._do_related_docs_GET()
 		else:
 			self._do_default_POST()
 
@@ -77,12 +79,8 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 			response['status'] = HTTPStatus.UNPROCESSABLE_ENTITY  # code 422
 			response['body'] = {'errno': 1, 'errstr': 'Missing "q" parameter in GET querystring'}
 		else:
-			# TODO: Add error checking (e.g., if a param is not a valid int)
-			max_results = int(req_body['maxResults'][0]) if 'maxResults' in req_body else 0
-			offset = int(req_body['offset'][0]) if 'offset' in req_body else 0
-			getFullDocs = True if (('getFullDocs' in req_body) and (int(req_body['getFullDocs'][0]) == 1)) else False
-
-			response = self._do_qs_search(req_body['q'][0], max_results=max_results, offset=offset, getFullDocs=getFullDocs)
+			search_params = self._get_generic_search_params(req_body)
+			response = self._do_qs_search(req_body['q'][0], **search_params)
 
 		response_body = json.dumps(response['body']).encode()
 
@@ -95,9 +93,57 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 		f.flush()
 
 
+	def _do_related_docs_GET(self):
+		req_body = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+
+		if 'docid' not in req_body:
+			response['status'] = HTTPStatus.UNPROCESSABLE_ENTITY  # code 422
+			response['body'] = {'errno': 1, 'errstr': 'Missing "docid" parameter in GET querystring'}
+		else:
+			search_params = self._get_generic_search_params(req_body)
+			response = self._do_related_doc_search(req_body['docid'][0], **search_params)
+
+		response_body = json.dumps(response['body']).encode()
+
+		self.send_response(response['status'])
+		self.send_header("Content-type", "application/json")
+		self.send_header("Content-Length", str(len(response_body)))
+		self.end_headers()
+		f = self.wfile
+		f.write(response_body)
+		f.flush()
+
+
+	def _get_generic_search_params(self, req_body):
+		params = dict()
+
+		# TODO: Add error checking (e.g., if a param is not a valid int)
+		params['max_results'] = int(req_body['maxResults'][0]) if 'maxResults' in req_body else 0
+		params['offset'] = int(req_body['offset'][0]) if 'offset' in req_body else 0
+		params['getFullDocs'] = True if (('getFullDocs' in req_body) and (int(req_body['getFullDocs'][0]) == 1)) else False
+
+		return params
+
+
 	def _do_qs_search(self, query, **kwargs):
 
 		search_results = self.server.search_engine.search_qs(query, **kwargs)
+		results_arr = [{'_id': r[1], 'score': r[0]} for r in search_results]
+
+		response = dict()
+		response['status'] = 200
+		response['body'] = {
+			'errno': 0,
+			'errstr': '',
+			'numResults': len(results_arr),
+			'results': results_arr
+		};
+		return response
+
+
+	def _do_related_doc_search(self, docid, **kwargs):
+
+		search_results = self.server.search_engine.search_docid(docid, **kwargs)
 		results_arr = [{'_id': r[1], 'score': r[0]} for r in search_results]
 
 		response = dict()

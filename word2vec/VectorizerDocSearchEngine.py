@@ -23,25 +23,44 @@ class VectorizerDocSearchEngine:
 
 		docs = []
 		self._idx2id = []
+		self._id2idx = dict()
 		for doc in cran_data:
-			docs.append(doc['W'])
+			# ID is mapped to the current index in the `docs` array
+			# Obviously, it's important to do this before appending
+			# to `docs`.
+			self._id2idx[doc['I']] = len(docs)
+
+			# Map the current doc's index in the array to its ID
 			self._idx2id.append(doc['I'])
+
+			docs.append(doc['W'])
+
 
 		#self._vectorizer = TfIdfDocVectorizer(token2id, len(id2freq))
 		self._vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
 
-		doc_embeds = self._vectorizer.make_doc_embedding_storage(docs)
-		self._query_engine = QueryEngineCore(doc_embeds, comparator_func=np.dot)
+		self._doc_embeds = self._vectorizer.make_doc_embedding_storage(docs)
+		self._query_engine = QueryEngineCore(self._doc_embeds, comparator_func=np.dot)
 
 
-	def search_qs(self, query, max_results=sys.maxsize, offset=0, getFullDocs=False):
-		if max_results == 0:
-			max_results = sys.maxsize
-
+	def search_qs(self, query, **generic_search_kwargs):
 		query_vec = self._vectorizer.make_doc_vector(query);
 		query_unitvec = query_vec/np.linalg.norm(query_vec)
 
-		results = self._query_engine.search(query_unitvec)[offset:(offset+max_results)]
+		return self.search_queryvec(query_unitvec, **generic_search_kwargs)
+
+
+
+	def search_docid(self, doc_id, **generic_search_kwargs):
+		query_vec = self._doc_embeds.get_by_id(self._id2idx[doc_id]);
+		return self.search_queryvec(query_vec, **generic_search_kwargs)
+
+
+	def search_queryvec(self, query_vec, max_results=sys.maxsize, offset=0, getFullDocs=False):
+		if max_results == 0:
+			max_results = sys.maxsize
+
+		results = self._query_engine.search(query_vec)[offset:(offset+max_results)]
 
 		# Convert doc IDs
 		converted_results = []
@@ -51,5 +70,3 @@ class VectorizerDocSearchEngine:
 			converted_results.append(tuple(res_aslist))
 
 		return converted_results
-			
-
