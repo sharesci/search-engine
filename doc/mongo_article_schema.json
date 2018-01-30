@@ -1,0 +1,60 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "ShareSci MongoDB Article Schema",
+	"description": "The format of articles stored in the MongoDB backend of ShareSci.",
+	"type": "object",
+	"properties": [
+		"_id": {
+			"description": "The MongoDB ID of the document",
+			"type": "string"
+		},
+		"abstract": {
+			"description": "The abstract of the article",
+			"type": "string"
+		},
+		"authors": {
+			"description": "The authors of the paper. These can either be listed as a string, or can have a more structured array representation.",
+			"anyOf": [
+				{"type": "string"},
+				{
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"firstname": {"type": "string"},
+							"lastname": {"type": "string"}
+						}
+					}
+				}
+			]
+		},
+		"body": {
+			"description": "The full text of the article",
+			"type": "string"
+		},
+		"created": {
+			"description": "String representing the time/date that this article was originally created",
+			"type": "string"
+		},
+		"journal": {
+			"description": "The journal in which this article was published (if any)",
+			"type": "string"
+		},
+		"other": {
+			"description": "Object containing any other data that does not fit into the schema",
+			"type": "object"
+		},
+		"references": {
+			"description": "List of references that were cited in the article",
+			"type": "array",
+			"items": {
+				"type": "object"
+			}
+		},
+		"title": {
+			"description": "The title of the article",
+			"type": "string"
+		}
+	],
+	"required": ["_id", "authors", "body", "title"]
+}
