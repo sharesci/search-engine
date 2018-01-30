@@ -3,40 +3,42 @@ import numpy as np
 import json
 import sys
 import os
+
+import pymongo
+
 from QueryEngineCore import QueryEngineCore
 from DocVectorizer import Word2vecDocVectorizer, TfIdfDocVectorizer
 
 
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata');
-cranfield_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'cranfield_data');
 
 class VectorizerDocSearchEngine:
 	def __init__(self):
-		with open(os.path.join(data_dir, 'token2id.json'), 'r') as f:
-			token2id = json.load(f);
+		# We expect a MongoDB instance to be running. It should have
+		# database 'sharesci', where token2id and id2freq are stored in
+		# a 'special_objects' collection and documents are from the
+		# 'cranfield' collection.
+		mongo_client = pymongo.MongoClient('localhost', 27017)
+		self._mongo_db = mongo_client['sharesci']
 
-		with open(os.path.join(data_dir, 'id2freq.npy'), 'rb') as f:
-			self._id2freq = np.load(f);
-
-		with open(os.path.join(cranfield_dir, 'cran.json'), 'r') as f:
-			cran_data = json.load(f)
+		token2id = self._mongo_db['special_objects'].find_one({'key': 'token2id'})['value']
+		self._id2freq = self._mongo_db['special_objects'].find_one({'key': 'id2freq'})['value']
 
 		docs = []
 		self._idx2id = []
 		self._id2idx = dict()
-		for doc in cran_data:
+		for mongo_doc in self._mongo_db['cranfield'].find({}):
 			# ID is mapped to the current index in the `docs` array
 			# Obviously, it's important to do this before appending
 			# to `docs`.
-			self._id2idx[doc['I']] = len(docs)
+			self._id2idx[str(mongo_doc['_id'])] = len(docs)
 
 			# Map the current doc's index in the array to its ID
-			self._idx2id.append(doc['I'])
+			self._idx2id.append(str(mongo_doc['_id']))
 
-			docs.append(doc['W'])
+			docs.append(mongo_doc['body'])
 
 
-		#self._vectorizer = TfIdfDocVectorizer(token2id, len(id2freq))
 		self._vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
 
 		self._doc_embeds = self._vectorizer.make_doc_embedding_storage(docs)
@@ -48,7 +50,6 @@ class VectorizerDocSearchEngine:
 		query_unitvec = query_vec/np.linalg.norm(query_vec)
 
 		return self.search_queryvec(query_unitvec, **generic_search_kwargs)
-
 
 
 	def search_docid(self, doc_id, **generic_search_kwargs):
@@ -66,7 +67,7 @@ class VectorizerDocSearchEngine:
 		converted_results = []
 		for result in results:
 			res_aslist = list(result)
-			res_aslist[1] = int(self._idx2id[result[1]])
+			res_aslist[1] = self._idx2id[result[1]]
 			converted_results.append(tuple(res_aslist))
 
 		return converted_results
