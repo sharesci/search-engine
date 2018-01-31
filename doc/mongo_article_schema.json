@@ -51,6 +51,10 @@
 				"type": "object"
 			}
 		},
+		"url": {
+			"description": "The url of the article",
+			"type": "string"
+		},
 		"title": {
 			"description": "The title of the article",
 			"type": "string"
