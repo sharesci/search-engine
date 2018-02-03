@@ -1,3 +1,20 @@
+#!/usr/bin/env -p python3
+
+## @file
+#
+# Trains a Paragraph Vector model.
+#
+# EXAMPLES:
+# 
+# Train a model using the default `text_training_data.pickle` file (which can
+# be created using save_TextTrainingData.py), using RCNN to generate word
+# embeddings, and learning the word embeddings (as opposed to loading
+# pre-trained word embeddings and holding them constant):
+# 
+#     python3 paragraph2vec.py --word_embedding_method rcnn --train_word_embeddings
+#
+
+
 import cntk as C
 import numpy as np
 import pickle
