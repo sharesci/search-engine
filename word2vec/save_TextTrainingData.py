@@ -9,7 +9,17 @@
 #
 # EXAMPLES:
 #
-# Prepare arXiv data
+# Prepare a training set for paragraph2vec with arXiv data that is stored in
+# the 'arxiv' collection in MongoDB (running on localhost):
+# 
+#     python3 save_TextTrainingData.py --data_source mongo --data_location arxiv --paragraph2vec
+# 
+# 
+# Prepare a training set for word2vec consisting of the Cranfield documents in
+# this repository:
+#
+#     python3 save_TextTrainingData.py --data_source cranfield
+# 
 
 import pickle
 from TextTrainingData import TextTrainingData
@@ -21,15 +31,16 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser()
 parser.add_argument('--paragraph2vec', dest='paragraph2vec', action='store_true', default=False)
-parser.add_argument('--data_source_type', dest='data_source_type', action='store', type=str, choices=['arxiv', 'cranfield'], default='arxiv')
-parser.add_argument('--data_location', dest='data_location', action='store', type=str, default='')
+parser.add_argument('--data_source_type', dest='data_source_type', action='store', type=str, choices=['arxiv', 'cranfield', 'mongo'], default='arxiv')
+parser.add_argument('--data_location', dest='data_location', action='store', type=str, default='', help='The location of the data source. This is the filesystem path for arxiv or cranfield sources, and the collection name for Mongo')
 cmdargs = parser.parse_args(sys.argv[1:])
 
 base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata')
 
 default_data_locations = {
 	'cranfield': os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'cranfield_data', 'cran.json'),
-	'arxiv': '/mnt/data_partition/sharesci/arxiv/preproc/tmp/'
+	'arxiv': '/mnt/data_partition/sharesci/arxiv/preproc/tmp/',
+	'mongo': 'papers'
 }
 data_location = cmdargs.data_location
 if data_location == '':
@@ -57,10 +68,26 @@ elif cmdargs.data_source_type == 'arxiv':
 			else:
 				data.add_text(f.read())
 		if i % 1000 == 0:
-			print(i)
+			print('Processed {}'.format(i), end='\r')
+		i += 1
+elif cmdargs.data_source_type == 'mongo':
+	import pymongo
+	mongo_client = pymongo.MongoClient('localhost', 27017)
+	db = mongo_client['sharesci']
+
+	i = 0
+	for doc in db[data_location].find({'body': {'$exists': True}}):
+		if cmdargs.paragraph2vec:
+			data.add_text(doc['body'], doc_name=doc['title'])
+		else:
+			data.add_text(doc['body'])
+
+		if i % 1000 == 0:
+			print('Processed {}'.format(i), end='\r')
 		i += 1
 
-print('Deleting infrequent tokens')
+print()
+print('Deleting infrequent tokens...')
 num_positions_deleted, num_tokens_deleted = data.purge_infrequent_tokens()
 print('Deleted {:d} tokens and {:d} positions'.format(num_tokens_deleted, num_positions_deleted))
 print('Total vocab size in the end is {:d}'.format(len(data.id2freq)))
