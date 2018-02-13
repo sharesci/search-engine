@@ -3,6 +3,7 @@ import numpy as np
 import json
 import sys
 import os
+import sklearn.svm
 
 import pymongo
 
@@ -57,17 +58,37 @@ class VectorizerDocSearchEngine:
 		return self.search_queryvec(query_vec, **generic_search_kwargs)
 
 
+	def search_userid(self, user_id, max_results=sys.maxsize, offset=0, getFullDocs=False):
+		if max_results == 0:
+			max_results = sys.maxsize
+
+		user_history_vec = np.random.randint(low=0, high=2, size=len(self._doc_embeds))
+		user_svm = sklearn.svm.LinearSVC(class_weight='balanced', verbose=False, max_iter = 2000, C=0.1)
+		user_svm.fit(self._doc_embeds.as_numpy_array(), user_history_vec)
+
+		results = QueryEngineCore.search_static(np.zeros(1), self._doc_embeds, lambda vec, qvec: float(user_svm.decision_function([vec])), max_results=(offset+max_results))[offset:(offset+max_results)]
+
+		return self._convert_result_format(results)
+		
+
 	def search_queryvec(self, query_vec, max_results=sys.maxsize, offset=0, getFullDocs=False):
 		if max_results == 0:
 			max_results = sys.maxsize
 
-		results = self._query_engine.search(query_vec)[offset:(offset+max_results)]
+		results = self._query_engine.search(query_vec, max_results=(offset+max_results))[offset:(offset+max_results)]
+
+		return self._convert_result_format(results)
+
+
+	def _convert_result_format(self, search_results):
 
 		# Convert doc IDs
 		converted_results = []
-		for result in results:
+		for result in search_results:
 			res_aslist = list(result)
 			res_aslist[1] = self._idx2id[result[1]]
 			converted_results.append(tuple(res_aslist))
 
 		return converted_results
+		
+

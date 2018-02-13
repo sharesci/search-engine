@@ -38,6 +38,8 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 			self._do_search_GET()
 		elif req_parts.path == '/related-docs':
 			self._do_related_docs_GET()
+		elif req_parts.path == '/user-recommendations':
+			self._do_user_recommendations_GET()
 		else:
 			self._do_default_POST()
 
@@ -74,6 +76,7 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 
 	def _do_search_GET(self):
 		req_body = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+		response = dict()
 
 		if 'q' not in req_body:
 			response['status'] = HTTPStatus.UNPROCESSABLE_ENTITY  # code 422
@@ -95,6 +98,7 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 
 	def _do_related_docs_GET(self):
 		req_body = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+		response = dict()
 
 		if 'docid' not in req_body:
 			response['status'] = HTTPStatus.UNPROCESSABLE_ENTITY  # code 422
@@ -102,6 +106,28 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 		else:
 			search_params = self._get_generic_search_params(req_body)
 			response = self._do_related_doc_search(req_body['docid'][0], **search_params)
+
+		response_body = json.dumps(response['body']).encode()
+
+		self.send_response(response['status'])
+		self.send_header("Content-type", "application/json")
+		self.send_header("Content-Length", str(len(response_body)))
+		self.end_headers()
+		f = self.wfile
+		f.write(response_body)
+		f.flush()
+
+
+	def _do_user_recommendations_GET(self):
+		req_body = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+		response = dict()
+
+		if 'userid' not in req_body:
+			response['status'] = HTTPStatus.UNPROCESSABLE_ENTITY  # code 422
+			response['body'] = {'errno': 1, 'errstr': 'Missing "userid" parameter in GET querystring'}
+		else:
+			search_params = self._get_generic_search_params(req_body)
+			response = self._do_user_recommendations_search(req_body['userid'][0], **search_params)
 
 		response_body = json.dumps(response['body']).encode()
 
@@ -126,24 +152,19 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 
 
 	def _do_qs_search(self, query, **kwargs):
-
-		search_results = self.server.search_engine.search_qs(query, **kwargs)
-		results_arr = [{'_id': r[1], 'score': r[0]} for r in search_results]
-
-		response = dict()
-		response['status'] = 200
-		response['body'] = {
-			'errno': 0,
-			'errstr': '',
-			'numResults': len(results_arr),
-			'results': results_arr
-		};
-		return response
+		return self._do_generic_search(self.server.search_engine.search_qs, query, **kwargs)
 
 
 	def _do_related_doc_search(self, docid, **kwargs):
+		return self._do_generic_search(self.server.search_engine.search_docid, docid, **kwargs)
 
-		search_results = self.server.search_engine.search_docid(docid, **kwargs)
+
+	def _do_user_recommendations_search(self, userid, **kwargs):
+		return self._do_generic_search(self.server.search_engine.search_userid, userid, **kwargs)
+
+
+	def _do_generic_search(self, search_function, search_param, **kwargs):
+		search_results = search_function(search_param, **kwargs)
 		results_arr = [{'_id': r[1], 'score': r[0]} for r in search_results]
 
 		response = dict()
@@ -175,6 +196,7 @@ if __name__ == '__main__':
 	search_engine = VectorizerDocSearchEngine()
 
 	server = SearchServer(config_options, search_engine, ('', cmdargs.port), SearchRequestHandler)
+	print('Initialized server. Starting on port {}.'.format(cmdargs.port))
 	server.serve_forever()
 
 	conn.close()
