@@ -146,7 +146,7 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 		# TODO: Add error checking (e.g., if a param is not a valid int)
 		params['max_results'] = int(req_body['maxResults'][0]) if 'maxResults' in req_body else 0
 		params['offset'] = int(req_body['offset'][0]) if 'offset' in req_body else 0
-		params['getFullDocs'] = True if (('getFullDocs' in req_body) and (int(req_body['getFullDocs'][0]) == 1)) else False
+		params['getFullDocs'] = True if (('getFullDocs' in req_body) and (req_body['getFullDocs'][0].lower() == 'true')) else False
 
 		return params
 
