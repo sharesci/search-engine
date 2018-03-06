@@ -119,6 +119,8 @@ class VectorizerDocSearchEngine:
 		# Convert doc IDs
 		converted_results = []
 		for result in search_results:
+			if result[0] < 0:
+				continue
 			res_aslist = list(result)
 			res_aslist[1] = self._idx2id[result[1]]
 			converted_results.append(tuple(res_aslist))
