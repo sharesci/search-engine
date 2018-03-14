@@ -1,0 +1,91 @@
+{
+	"Cloud Computing": ["1702.07431.preproc", "1703.00374.preproc", "1702.04024.preproc", "1701.07154.preproc"],
+	"autonomous robot": [
+	"1703.04741.preproc",
+	"1703.08736.preproc",
+	"1702.05515.preproc",
+	"1703.02018.preproc",
+	"1703.10284.preproc"
+	],
+	"convex optimization": [
+	"1702.04783.preproc",
+	"1702.08704.preproc",
+	"1702.02299.preproc",
+	"1702.05423.preproc",
+	"1704.03004.preproc",
+	"1702.05914.preproc",
+	"1702.02030.preproc",
+	"1702.06457.preproc",
+	"1702.06751.preproc",
+	"1704.08953.preproc"
+	],
+	"deep reinforcement learning": [
+	"1702.08360.preproc",
+	"1703.03054.preproc",
+	"1703.01161.preproc",
+	"1701.08936.preproc",
+	"1704.03073.preproc",
+	"1702.05573.preproc",
+	"1703.01732.preproc",
+	"1703.10931.preproc",
+	"1702.08887.preproc",
+	"1702.06230.preproc"
+	],
+	"gravitational waves": [
+	"1704.08904.preproc",
+	"1704.05116.preproc",
+	"1704.07383.preproc",
+	"1703.00307.preproc",
+	"1702.08284.preproc",
+	"1704.03719.preproc"
+	],
+	"image recognition": [
+	"1704.07595.preproc",
+	"1704.05051.preproc",
+	"1701.06599.preproc",
+	"1703.10593.preproc",
+	"1703.08961.preproc",
+	"1703.08961.preproc",
+	"1704.07863.preproc",
+	"1701.04769.preproc",
+	"1702.07006.preproc"
+	],
+	"multi agent task allocation": [
+	"1703.00289.preproc",
+	"1703.06182.preproc",
+	"1702.01399.preproc",
+	"1704.06868.preproc",
+	"1703.01649.preproc"
+	],
+	"planet formation": [
+	"1703.10618.preproc",
+	"1701.01786.preproc",
+	"1701.01661.preproc",
+	"1703.05950.preproc",
+	"1704.02261.preproc"
+	],
+	"quantum tunnelling": [
+	"1704.04432.preproc",
+	"1702.07931.preproc",
+	"1703.08189.preproc",
+	"1702.00356.preproc",
+	"1703.00789.preproc",
+	"1703.04607.preproc",
+	"1701.04084.preproc",
+	"1702.07511.preproc",
+	"1702.07943.preproc",
+	"1701.04579.preproc"
+	],
+	"sampling path planning random": [
+	"1703.00194.preproc",
+	"1704.04585.preproc",
+	"1702.01848.preproc",
+	"1703.02640.preproc",
+	"1703.03146.preproc",
+	"1702.03429.preproc",
+	"1704.01886.preproc",
+	"1703.04211.preproc",
+	"1702.00425.preproc",
+	"1702.03920.preproc"
+	]
+}

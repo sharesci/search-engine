@@ -26,11 +26,11 @@ DEFAULT_QUERY_WEIGHTS = {
 	'authors': 0.2,
 }
 
-pg_conn = psycopg2.connect("dbname='sharesci' user='sharesci' host='137.148.143.96' password='sharesci'")
-mongo_client = pymongo.MongoClient('137.148.143.48', 27017)
+pg_conn = psycopg2.connect("dbname='sharesci' user='sharesci' host='localhost' password='sharesci'")
+mongo_client = pymongo.MongoClient('localhost', 27017)
 
 mongo_db = mongo_client['sharesci']
-papers_collection = mongo_db['papers']
+papers_collection = mongo_db['wiki']
 
 stemmer = PorterStemmer(mode=PorterStemmer.MARTIN_EXTENSIONS)
 
@@ -59,14 +59,18 @@ def get_idfs(terms):
 				)
 				LEFT OUTER JOIN idf ON (idf.gram_id = gram.gram_id);
 			""".format(values_str);
+		print('', sql)
 		cur.execute(sql)
 		result_tuples = cur.fetchall();
 		result = {}
 		for t in result_tuples:
 			term = (t[0],t[1])
 			gram_id = t[2]
-			df = float(t[3]) + 1    # Add 1 to protect against div-by-zero
-			idf = np.log(1 + (num_docs / df))
+			if t[3] == 0:
+				df = 1
+			else:
+				df = float(t[3])     # Add 1 to protect against div-by-zero
+			idf = np.log((num_docs / df))
 			result[term] = (gram_id, idf)
 	except psycopg2.Error as err:
 		print('Failed to get term DFs', file=sys.stderr)
@@ -117,6 +121,7 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20, weights=DEFAUL
 						WHEN 2 THEN {title_weight:0.4f} 
 						WHEN 3 THEN {abstract_weight:0.4f} 
 						WHEN 4 THEN {authors_weight:0.4f} 
+                                                WHEN 5 THEN {fulltext_weight:0.4f}
 						ELSE 0.0 
 					END)
 				), 0) AS similarity
@@ -139,6 +144,7 @@ def query_cosine_similarities(query_tfidf_tuples, max_results=20, weights=DEFAUL
 		authors_weight=weights['authors'],
 	);
 
+	print('', sql)
 	try:
 		cur.execute(sql, (max_results,))
 		result = cur.fetchall()
@@ -221,14 +227,14 @@ def process_query(query, max_results=20, weights=DEFAULT_QUERY_WEIGHTS, print_id
 def attach_metadata(results):
 	metadata_results = []
 	for result in results:
-		metadata = {'raw_id': result[0], 'title': '', 'arxiv_id': '', 'score': result[1]}
+		metadata = {'_id': result[0], 'title': '', 'id': '', 'score': result[1]}
 		if len(result[0]) == 24:
 			mongo_result = papers_collection.find({'_id': ObjectId(result[0])})[0]
 			metadata['title'] = mongo_result['title'];
-			metadata['arxiv_id'] = mongo_result['arXiv_id'];
-			metadata['mongo_id'] = result[0];
+			metadata['id'] = mongo_result['id'];
+			metadata['_id'] = result[0];
 		else:
-			metadata['arxiv_id'] = result[0];
+			metadata['id'] = result[0];
 		metadata_results.append(metadata);
 	return metadata_results;
 
@@ -241,10 +247,10 @@ def attach_metadata(results):
 # 	similarity score (from some query).
 #
 def pretty_print_metadata_results(results):
-	print('{:>2s}  {:100s}  {:15s}  {:7s}        '.format('#', 'Title', 'arXiv id', 'Score'))
+	print('{:>2s}  {:100s}  {:15s}  {:7s}        '.format('#', 'Title', 'wiki id', 'Score'))
 	result_num = 1
 	for result in results:
-		print('{:2d}. {:100s}  {:15s}  {:0.5f}    '.format(result_num, re.sub('[ ]*\n[ ]*', ' ', result['title']), result['arxiv_id'], result['score']))
+		print('{:2d}. {:100s}  {:15s}  {:0.5f}    '.format(result_num, re.sub('[ ]*\n[ ]*', ' ', result['title']), result['id'], result['score']))
 		result_num += 1
 
 
@@ -259,6 +265,7 @@ if __name__ == '__main__':
 
 			start_time = time.perf_counter()
 			doc_scores = process_query(query, max_results=20)
+			print(doc_scores)
 			times['query'] = time.perf_counter() - start_time
 			
 			start_time = time.perf_counter()
