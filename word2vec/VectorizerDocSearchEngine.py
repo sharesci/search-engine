@@ -10,13 +10,18 @@ import pymongo
 import itertools
 
 from QueryEngineCore import QueryEngineCore
-from DocVectorizer import Word2vecDocVectorizer, TfIdfDocVectorizer
+from DocVectorizer import Word2vecDocVectorizer, TfIdfDocVectorizer, OneShotNetworkDocVectorizer
+from NumpyEmbeddingStorage import NumpyEmbeddingStorage
 
 
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata');
 
 class VectorizerDocSearchEngine:
 	def __init__(self):
+		self._reload_all_docs()
+
+
+	def _reload_all_docs(self):
 		# We expect a MongoDB instance to be running. It should have
 		# database 'sharesci', where token2id and id2freq are stored in
 		# a 'special_objects' collection and documents are from the
@@ -27,25 +32,49 @@ class VectorizerDocSearchEngine:
 		token2id = self._mongo_db['special_objects'].find_one({'key': 'token2id'})['value']
 		self._id2freq = self._mongo_db['special_objects'].find_one({'key': 'id2freq'})['value']
 
-		docs = []
+		#self._vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
+		self._vectorizer = OneShotNetworkDocVectorizer(os.path.join(data_dir, 'directdoc2vec_checkpoint.dnn'), filter_size=3)
+
+		doc_embed_list = []
 		self._idx2id = []
 		self._id2idx = dict()
 		for mongo_doc in self._mongo_db['papers'].find({}):
 			# ID is mapped to the current index in the `docs` array
 			# Obviously, it's important to do this before appending
 			# to `docs`.
-			self._id2idx[str(mongo_doc['_id'])] = len(docs)
+			self._id2idx[str(mongo_doc['_id'])] = len(doc_embed_list)
 
 			# Map the current doc's index in the array to its ID
 			self._idx2id.append(str(mongo_doc['_id']))
 
-			docs.append(mongo_doc['body'])
+			# Now make sure we have a vector for the doc
+			if 'other' not in mongo_doc.keys():
+				mongo_doc['other'] = dict()
+			if 'directdoc_vec' not in mongo_doc['other'].keys():
+				mongo_doc['other']['directdoc_vec'] = list(self._vectorizer.make_doc_vector(mongo_doc['body']).astype(float))
+				self._mongo_db['papers'].update({'_id': mongo_doc['_id']}, {'$set': {'other.directdoc_vec': mongo_doc['other']['directdoc_vec']}})
 
+			doc_embed_list.append(mongo_doc['other']['directdoc_vec'])
 
-		self._vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
+		# Get embed dim (should be the same for all docs, but take the
+		# max just in case, so shorter embeds will be padded with
+		# zeros)
+		embed_size = max(len(doc_embed) for doc_embed in doc_embed_list)
 
-		self._doc_embeds = self._vectorizer.make_doc_embedding_storage(docs)
+		# Convert embeddings to an official storage object
+		self._doc_embeds = np.zeros((len(doc_embed_list), embed_size), dtype=np.float64)
+		for i in range(len(doc_embed_list)):
+			self._doc_embeds[i][:] = np.array(doc_embed_list[i][0:embed_size], dtype=np.float64)
+		self._doc_embeds = NumpyEmbeddingStorage(self._doc_embeds)
+
 		self._query_engine = QueryEngineCore(self._doc_embeds, comparator_func=np.dot)
+
+
+	def notify_new_docs(self, new_doc_ids=[]):
+		# TODO: Use the new_doc_ids input to update only the docs that
+		# changed. Currently this function always reloads everything,
+		# which is inefficient and scales poorly
+		self._reload_all_docs()
 
 
 	def search_qs(self, query, **generic_search_kwargs):

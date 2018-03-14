@@ -62,6 +62,11 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 
 	def _do_notifynewdoc_POST(self):
 		# TODO: Add code to update search engine with new doc
+		req_body = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+		doc_ids = []
+		if '_id' in req_body:
+			doc_ids = list(req_body['_id'])
+		self.server.search_engine.notify_new_docs(doc_ids)
 		
 		# No failure cases implemented yet, so just assume it worked
 		response_body = json.dumps({'errstr': ''})
