@@ -7,7 +7,7 @@ import re
 import json
 import sys
 import scipy.sparse
-from QueryEngineCore import QueryEngineCore
+from QueryEngineCore import ComparatorQueryEngineCore
 from DocVectorizer import Word2vecDocVectorizer, TfIdfDocVectorizer
 from argparse import ArgumentParser
 
@@ -49,7 +49,7 @@ if __name__ == '__main__' and datasource == 'cranfield':
 			vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
 
 		doc_embeds = vectorizer.make_doc_embedding_storage(docs)
-		query_engine = QueryEngineCore(doc_embeds, comparator_func=np.dot)
+		query_engine = ComparatorQueryEngineCore(doc_embeds, comparator_func=np.dot)
 		for query in cran_qrel:
 			query_vec = vectorizer.make_doc_vector(query);
 			query_unitvec = query_vec/np.linalg.norm(query_vec)
@@ -66,7 +66,7 @@ if __name__ == '__main__' and datasource == 'cranfield':
 			sub = np.subtract(vec1,vec2)
 			return 15/np.dot(sub, sub)
 			#return float(np.dot(vec1, vec2)/np.linalg.norm(vec2))
-		query_engine = QueryEngineCore(doc_embeds, comparator_func = comparator)
+		query_engine = ComparatorQueryEngineCore(doc_embeds, comparator_func = comparator)
 		for query in cran_qrel:
 			if len(cran_qrel[query]) == 0:
 				query_vectors[query] = np.zeros(300)

@@ -9,7 +9,7 @@ import pymongo
 
 import itertools
 
-from QueryEngineCore import QueryEngineCore
+from QueryEngineCore import ComparatorQueryEngineCore, AnnoyQueryEngineCore
 from DocVectorizer import Word2vecDocVectorizer, TfIdfDocVectorizer, OneShotNetworkDocVectorizer
 from NumpyEmbeddingStorage import NumpyEmbeddingStorage
 
@@ -67,7 +67,7 @@ class VectorizerDocSearchEngine:
 			self._doc_embeds[i][:] = np.array(doc_embed_list[i][0:embed_size], dtype=np.float64)
 		self._doc_embeds = NumpyEmbeddingStorage(self._doc_embeds)
 
-		self._query_engine = QueryEngineCore(self._doc_embeds, comparator_func=np.dot)
+		self._query_engine = AnnoyQueryEngineCore(self._doc_embeds)
 
 
 	def notify_new_docs(self, new_doc_ids=[]):
@@ -123,7 +123,7 @@ class VectorizerDocSearchEngine:
 		user_svm = sklearn.svm.LinearSVC(class_weight='balanced', verbose=False, max_iter = 2000, C=0.1, tol=1e-5)
 		user_svm.fit(self._doc_embeds.as_numpy_array(), user_history_vec)
 
-		results = QueryEngineCore.search_static(np.zeros(1), self._doc_embeds, lambda vec, qvec: float(user_svm.decision_function([vec])), max_results=(offset+max_results+len(user_docIds_arr)))
+		results = ComparatorQueryEngineCore.search_static(np.zeros(1), self._doc_embeds, lambda vec, qvec: float(user_svm.decision_function([vec])), max_results=(offset+max_results+len(user_docIds_arr)))
 
 		# Filter to exclude any docs the user has already seen
 		results[:] = itertools.filterfalse((lambda x: x[1] in user_docIdxs), results)
@@ -148,7 +148,7 @@ class VectorizerDocSearchEngine:
 		# Convert doc IDs
 		converted_results = []
 		for result in search_results:
-			if result[0] < 0:
+			if result[0] == -sys.maxsize:
 				continue
 			res_aslist = list(result)
 			res_aslist[1] = self._idx2id[result[1]]
