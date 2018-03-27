@@ -36,7 +36,6 @@ class ComparatorQueryEngineCore:
 		# needs to be reversed
 		results = [heapq.heappop(scores_heap) for i in range(num_results)]
 		results.reverse()
-		print(results)
 
 		return results
 

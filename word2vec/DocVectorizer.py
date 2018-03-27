@@ -130,6 +130,7 @@ class TfIdfDocVectorizer(DocVectorizer):
 		for token in self._token_regex.findall(text):
 			if token in self._token2id:
 				vec[self._token2id[token]] += 1
+
 		return np.log(vec+1)
 
 
@@ -146,4 +147,67 @@ class TfIdfDocVectorizer(DocVectorizer):
 		unitvec_docs = text_embeddings_arr/docs_norm
 
 		return NumpyEmbeddingStorage(unitvec_docs)
+
+
+
+class WordvecAdjustedTfIdfDocVectorizer(TfIdfDocVectorizer):
+	##
+	# Like regular TF-IDF, but the TF vectors are adjusted based on the
+	# similarity of words. For example, since "walk" and "walking" are
+	# similar words and therefore have similar word2vec representations,
+	# when this method encounters the word "walk" it might add 1 to the
+	# "walk" component of the TF vector just like regular TF-IDF, but
+	# unlike normal TF-IDF it might also add 0.66 to the "walking"
+	# component. The exact amount added to each componenet is based on the
+	# distance of the word vectors.
+	#
+	# @param word_embeddings
+	# The table of word vectors (mapped by token2id)
+	#
+	# @param word_neighbors
+	# Table (2D numpy array) of the closest words to each word, for performance
+	# reasons. Like word_embeddings, each element on the 0 axis represents
+	# a word. The 1 axis is a list of indices of the closest words, in
+	# order of increasing distance.
+	#
+	# @param nearest_k
+	# How many nearest neighbors to involve when augmenting the TF vectors.
+	# Note that nearest_k=1 is equivalent to regular TF-IDF (just add
+	# a 1 to the componenet of the exact word found), nearest_k=2 puts
+	# a 1 at the exact word and affects one similar word, and so on.
+	# If word_neighbors does not have nearest_k neighbors listed for all
+	# words, nearest_k will be reduced to the largest number of neighbors
+	# available in word_neighbors.
+	#
+	def __init__(self, token2id, vocab_size, word_embeddings, word_neighbors, nearest_k=5):
+		super().__init__(token2id, vocab_size);
+
+		self._token2id = token2id
+		self._vocab_size = vocab_size
+		self._word_embeddings = word_embeddings
+		self._word_neighbors = word_neighbors
+		self._nearest_k = min(nearest_k, word_neighbors.shape[1])
+
+		self._token_regex = re.compile(r"(?u)\b\w+\b")
+
+
+	def _euclidean_distance(self, vec1, vec2):
+		vec_diff = vec2 - vec1
+		return np.sqrt(np.dot(vec_diff, vec_diff))
+
+		
+
+	def make_doc_vector(self, text):
+		vec = np.zeros(self._vocab_size)
+		for token in self._token_regex.findall(text):
+			if token not in self._token2id:
+				continue
+			word_ind = self._token2id[token]
+			vec[word_ind] += 1
+			for i in range(self._nearest_k):
+				near_word_ind = self._word_neighbors[word_ind][i]
+				if near_word_ind == word_ind:
+					continue
+				vec[near_word_ind] = 1 / self._euclidean_distance(self._word_embeddings[word_ind], self._word_embeddings[near_word_ind])
+		return np.log(vec+1)
 
