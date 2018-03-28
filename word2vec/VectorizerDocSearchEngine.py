@@ -9,14 +9,23 @@ import pymongo
 
 import itertools
 
-from QueryEngineCore import QueryEngineCore
-from DocVectorizer import Word2vecDocVectorizer, TfIdfDocVectorizer
+from QueryEngineCore import ComparatorQueryEngineCore, AnnoyQueryEngineCore
+from DocVectorizer import Word2vecDocVectorizer, TfIdfDocVectorizer, OneShotNetworkDocVectorizer, WordvecAdjustedTfIdfDocVectorizer
+from NumpyEmbeddingStorage import NumpyEmbeddingStorage, SparseEmbeddingStorage
 
 
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata');
 
 class VectorizerDocSearchEngine:
 	def __init__(self):
+		self._reload_all_docs()
+
+
+	def _vec_to_sparse_tuples(self, vec):
+		return [(int(x[0]), float(x[1])) for x in zip(vec.nonzero()[0], vec[vec.nonzero()[0]])]
+
+
+	def _reload_all_docs(self):
 		# We expect a MongoDB instance to be running. It should have
 		# database 'sharesci', where token2id and id2freq are stored in
 		# a 'special_objects' collection and documents are from the
@@ -27,29 +36,76 @@ class VectorizerDocSearchEngine:
 		token2id = self._mongo_db['special_objects'].find_one({'key': 'token2id'})['value']
 		self._id2freq = self._mongo_db['special_objects'].find_one({'key': 'id2freq'})['value']
 
-		docs = []
+		with open(os.path.join(data_dir, 'word2vec_vectors.npy'), 'rb') as f:
+			word_vectors = np.load(f)
+		with open(os.path.join(data_dir, 'word2vec_adjacencies1.npy'), 'rb') as f:
+			word_adj = np.load(f)
+		#self._vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
+		#self._vectorizer = OneShotNetworkDocVectorizer(os.path.join(data_dir, 'directdoc2vec_checkpoint.dnn'), filter_size=3)
+		#self._vectorizer = TfIdfDocVectorizer(token2id, len(token2id.keys()))
+		self._vectorizer = WordvecAdjustedTfIdfDocVectorizer(token2id, len(token2id.keys()), word_vectors, word_adj)
+
+		dfs = np.zeros(len(token2id.keys()))
+		doc_embed_list = []
 		self._idx2id = []
 		self._id2idx = dict()
 		for mongo_doc in self._mongo_db['papers'].find({}):
 			# ID is mapped to the current index in the `docs` array
 			# Obviously, it's important to do this before appending
 			# to `docs`.
-			self._id2idx[str(mongo_doc['_id'])] = len(docs)
+			self._id2idx[str(mongo_doc['_id'])] = len(doc_embed_list)
 
 			# Map the current doc's index in the array to its ID
 			self._idx2id.append(str(mongo_doc['_id']))
 
-			docs.append(mongo_doc['body'])
+			# Now make sure we have a vector for the doc
+			VEC_FIELD_NAME = 'new_tfidf_vec'
+			if 'other' not in mongo_doc.keys():
+				mongo_doc['other'] = dict()
+			if VEC_FIELD_NAME not in mongo_doc['other'].keys():
+				raw_embed = self._vectorizer.make_doc_vector(mongo_doc['abstract']).astype(float)
+				# Normalize length
+				norm_embed = raw_embed / np.sum(np.square(raw_embed))
+
+				mongo_doc['other'][VEC_FIELD_NAME] = self._vec_to_sparse_tuples(norm_embed)
+
+				self._mongo_db['papers'].update({'_id': mongo_doc['_id']}, {'$set': {('other.' + VEC_FIELD_NAME): mongo_doc['other'][VEC_FIELD_NAME]}})
+
+			doc_embed = mongo_doc['other'][VEC_FIELD_NAME]
+
+			# Update document frequencies
+			for elem in doc_embed:
+				if elem[1] >= 1:
+					dfs[elem[0]] += 1
+
+			doc_embed_list.append(doc_embed)
+
+		self._doc_embeds = doc_embed_list
+		self._idfs = np.log(len(doc_embed_list) / (dfs + 1))
+
+		# Get embed dim (should be the same for all docs, but take the
+		# max just in case, so shorter embeds will be padded with
+		# zeros)
+		#embed_size = max(len(doc_embed) for doc_embed in doc_embed_list)
+
+		# Convert embeddings to an official storage object
+		#self._doc_embeds = np.zeros((len(doc_embed_list), embed_size), dtype=np.float64)
+		#for i in range(len(doc_embed_list)):
+		#	self._doc_embeds[i][:] = np.array(doc_embed_list[i][0:embed_size], dtype=np.float64)
+		self._doc_embeds = SparseEmbeddingStorage(self._doc_embeds, len(token2id))
+
+		self._query_engine = ComparatorQueryEngineCore(self._doc_embeds, comparator_func=np.dot)
 
 
-		self._vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
-
-		self._doc_embeds = self._vectorizer.make_doc_embedding_storage(docs)
-		self._query_engine = QueryEngineCore(self._doc_embeds, comparator_func=np.dot)
+	def notify_new_docs(self, new_doc_ids=[]):
+		# TODO: Use the new_doc_ids input to update only the docs that
+		# changed. Currently this function always reloads everything,
+		# which is inefficient and scales poorly
+		self._reload_all_docs()
 
 
 	def search_qs(self, query, **generic_search_kwargs):
-		query_vec = self._vectorizer.make_doc_vector(query);
+		query_vec = self._vectorizer.make_doc_vector(query) * self._idfs;
 		query_unitvec = query_vec/np.linalg.norm(query_vec)
 
 		return self.search_queryvec(query_unitvec, **generic_search_kwargs)
@@ -94,7 +150,7 @@ class VectorizerDocSearchEngine:
 		user_svm = sklearn.svm.LinearSVC(class_weight='balanced', verbose=False, max_iter = 2000, C=0.1, tol=1e-5)
 		user_svm.fit(self._doc_embeds.as_numpy_array(), user_history_vec)
 
-		results = QueryEngineCore.search_static(np.zeros(1), self._doc_embeds, lambda vec, qvec: float(user_svm.decision_function([vec])), max_results=(offset+max_results+len(user_docIds_arr)))
+		results = ComparatorQueryEngineCore.search_static(np.zeros(1), self._doc_embeds, lambda vec, qvec: float(user_svm.decision_function([vec])), max_results=(offset+max_results+len(user_docIds_arr)))
 
 		# Filter to exclude any docs the user has already seen
 		results[:] = itertools.filterfalse((lambda x: x[1] in user_docIdxs), results)
@@ -119,7 +175,7 @@ class VectorizerDocSearchEngine:
 		# Convert doc IDs
 		converted_results = []
 		for result in search_results:
-			if result[0] < 0:
+			if result[0] == -sys.maxsize:
 				continue
 			res_aslist = list(result)
 			res_aslist[1] = self._idx2id[result[1]]
