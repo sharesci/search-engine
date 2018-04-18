@@ -47,6 +47,7 @@ default_model_save_filename = os.path.join(os.path.dirname(os.path.abspath(__fil
 parser = ArgumentParser()
 parser.add_argument('--training_data_file', dest='training_data_file', action='store', default=default_training_data_filename)
 parser.add_argument('--model_save_file', dest='model_save_file', action='store', default=default_model_save_filename)
+parser.add_argument('--model_load_file', dest='model_load_file', action='store', default="", help="File to load a model from to continue training")
 parser.add_argument('--word_embedding_file', dest='word_embedding_file', action='store', default='')
 parser.add_argument('--word_embedding_method', dest='word_embedding_method', action='store', default='lookup')
 parser.add_argument('--rcnn_filter_width', dest='rcnn_filter_width', type=int, action='store', default=3)
@@ -60,15 +61,17 @@ cmdargs = parser.parse_args(sys.argv[1:])
 
 ## Note the order of inputs to match the order of streams in
 # ParagraphMinibatchSource: [Label, DocId, ContextWords...]
+#
 def create_inputs(vocab_dim, num_docs):
 	inputs = []
-	label_vector = C.ops.input_variable(vocab_dim, np.float32, is_sparse=True)
-	docid_vector = C.ops.input_variable(num_docs, np.float32, is_sparse=True)
+	label_vector = C.ops.input_variable(vocab_dim, np.float32, is_sparse=True, name="label_input")
+	docid_vector = C.ops.input_variable(num_docs, np.float32, is_sparse=True, name="docid_input")
 	if cmdargs.word_embedding_method == 'rcnn':
-		input_word_vectors = [C.sequence.input_variable((1,), dtype=np.float32, sequence_axis=C.Axis.new_unique_dynamic_axis('word_{}'.format(i))) for i in range(context_size)]
+		input_word_vectors = [C.sequence.input_variable((1,), dtype=np.float32, sequence_axis=C.Axis.new_unique_dynamic_axis('word_{}'.format(i)), name="word_input_{}".format(i)) for i in range(context_size)]
 	else:
-		input_word_vectors = [C.ops.input_variable(vocab_dim, np.float32, is_sparse=True) for i in range(context_size)]
+		input_word_vectors = [C.ops.input_variable(vocab_dim, np.float32, is_sparse=True, name="word_input_{}".format(i)) for i in range(context_size)]
 	return [label_vector, docid_vector] + input_word_vectors
+
 
 def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 
@@ -156,7 +159,48 @@ def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 		with open(cmdargs.output_bias_init_file, 'rb') as f:
 			output_bias_init = np.load(f)
 
-	return cross_entropy_with_sampled_softmax(middle_layer, input_list[0], vocab_dim, hidden_dim*len(all_embeddings), num_of_samples, sampling_weights, weights_init = output_weights_init, bias_init = output_bias_init)
+	z, loss, error = cross_entropy_with_sampled_softmax(middle_layer, input_list[0], vocab_dim, hidden_dim*len(all_embeddings), num_of_samples, sampling_weights, weights_init = output_weights_init, bias_init = output_bias_init)
+
+	return C.combine(z, loss, error), loss, error
+
+
+## Recreate the doc Embedding layer while keeping everything else the same,
+# using num_docs to determine the embedding matrix size.
+#
+def reset_model_doc_embeddings(model, num_docs):
+	doc_embed_node = model.find_by_name("doc_embed")
+	hidden_dim = doc_embed_node.output.shape
+	doc_embed_placeholder = C.ops.placeholder(hidden_dim)
+
+	model = model.clone(C.CloneMethod.share, {doc_embed_node: doc_embed_placeholder})
+
+	docid_input = C.ops.input_variable(num_docs, np.float32, is_sparse=True, name="docid_input")
+	doc_embedding = C.layers.Embedding(hidden_dim, name="doc_embed")(docid_input)
+	model.replace_placeholders({doc_embed_placeholder: doc_embedding})
+
+	return model
+
+
+## Given a model, extract a list of inputs in the proper order (same order as
+# create_inputs)
+#
+def get_model_input_list(model):
+	misc_inputs = [model.find_by_name('label_input'), model.find_by_name('docid_input')]
+
+	num_word_inputs = len(model.arguments) - len(misc_inputs)
+	word_inputs = [model.find_by_name("word_input_{}".format(i)) for i in range(num_word_inputs)]
+
+	return misc_inputs + word_inputs 
+
+
+def load_saved_model(model_filename):
+	model = C.load_model(model_filename)
+	cross_entropy = model.find_by_name('sampled_cross_entropy')
+	sampled_error = model.find_by_name('sampled_error')
+
+	input_list = get_model_input_list(model)
+
+	return model, cross_entropy, sampled_error, input_list
 
 
 def train():
@@ -171,7 +215,11 @@ def train():
 	num_docs = len(training_data.docs)
 	print('Training paragraph vectors for {:d} documents'.format(vocab_dim))
 
-	input_list = create_inputs(vocab_dim, num_docs)
+	if cmdargs.model_load_file == "":
+		input_list = create_inputs(vocab_dim, num_docs)
+		z, cross_entropy, error = create_model(input_list, freq_list, vocab_dim, hidden_dim) 
+	else:
+		z, cross_entropy, error, input_list = load_saved_model(cmdargs.model_load_file)
 
 	mb_source = None
 	if cmdargs.word_embedding_method == 'rcnn':
@@ -184,9 +232,7 @@ def train():
 
 	mb_num_samples = cmdargs.minibatch_size
 	mb_size = minibatch_size_schedule(mb_num_samples)
-	epoch_size = training_data.total_words()//2
-
-	z, cross_entropy, error = create_model(input_list, freq_list, vocab_dim, hidden_dim) 
+	epoch_size = training_data.total_words() // 2
 
 	lr_schedule = learning_rate_schedule([(3e-3)*(0.8**i) for i in range(12)], UnitType.sample, epoch_size = epoch_size)
 	gradient_clipping_with_truncation = True
@@ -205,10 +251,6 @@ def train():
 #		gradient_clipping_with_truncation=gradient_clipping_with_truncation)
 
 	progress_printer = C.logging.ProgressPrinter(freq=200, tag='Training')
-	checkpoint_config = CheckpointConfig(frequency = 100000*mb_num_samples,
-                                           filename = cmdargs.model_save_file,
-                                           restore = False)
-
 	trainer = Trainer(z, (cross_entropy, error), [learner], progress_writers=[progress_printer])
 	
 	input_streams = mb_source.stream_infos()
@@ -216,10 +258,23 @@ def train():
 	for i in range(len(input_list)):
 		input_map[input_list[i]] = input_streams[i]
 
-	session = training_session(trainer, mb_source, mb_size, input_map, progress_frequency=training_data.total_words(), max_samples = None, checkpoint_config=checkpoint_config, cv_config=None, test_config=None)
-	
 	C.logging.log_number_of_parameters(z) ; print()
-	session.train()
+
+	save_frequency = 100000 * mb_num_samples
+	progress_frequency = training_data.total_words()
+	mb_num = 0
+	total_samples = 0
+	while True:
+		mb_data = mb_source.next_minibatch(mb_num_samples)
+		train_status = trainer.train_minibatch({k: mb_data[input_map[k]] for k in input_map})
+		total_samples += mb_num_samples
+
+		if ((total_samples - mb_num_samples) // progress_frequency) < (total_samples // progress_frequency):
+			trainer.summarize_training_progress()
+		if ((total_samples - mb_num_samples) // save_frequency) < (total_samples // save_frequency):
+			z.save(cmdargs.model_save_file)
+
+		mb_num += 1
 
 
 if __name__ == '__main__':
