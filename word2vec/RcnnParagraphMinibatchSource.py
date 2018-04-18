@@ -3,10 +3,9 @@ import numpy as np
 
 
 class RcnnParagraphMinibatchSource(C.io.UserMinibatchSource):
-	def __init__(self, text_training_data, id2tok, input_list, filter_size, context_size=2):
+	def __init__(self, text_training_data, id2tok, input_list, context_size=2):
 		self.text_training_data = text_training_data
 		self.context_size = context_size
-		self._filter_size = filter_size
 
 		self.num_docs = len(self.text_training_data.docs)
 		self.vocab_dim = len(self.text_training_data.id2freq)
@@ -25,7 +24,7 @@ class RcnnParagraphMinibatchSource(C.io.UserMinibatchSource):
 		self.doc_si = C.io.StreamInformation("doc_id", 1, 'sparse', np.float32, (self.num_docs,))
 		self.word_si = []
 		for i in range(self.context_size):
-			self.word_si.append(C.io.StreamInformation("word_{:d}".format(i), 2+i, 'dense', np.float32, (3,256)))
+			self.word_si.append(C.io.StreamInformation("word_{:d}".format(i), 2+i, 'dense', np.float32, (1,)))
 
 
 	def stream_infos(self):
@@ -33,14 +32,11 @@ class RcnnParagraphMinibatchSource(C.io.UserMinibatchSource):
 
 
 	def str_to_inputs(self, text_str):
-		full_arr = np.zeros(len(text_str)+self._filter_size-1, dtype=np.float32)
+		full_arr = np.zeros(len(text_str), dtype=np.float32)
 		for i in range(len(text_str)):
 			full_arr[i] = ord(text_str[i])
 
-		ret_data = np.zeros((len(text_str)+self._filter_size-1, self._filter_size), dtype=np.float32)
-		for i in range(len(text_str)):
-			ret_data[i+self._filter_size-1] = full_arr[i:i+self._filter_size]
-		return ret_data
+		return full_arr
 		
 
 

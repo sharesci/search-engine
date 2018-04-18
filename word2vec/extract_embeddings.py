@@ -41,10 +41,7 @@ def str_to_inputs(text_str):
 	for i in range(len(text_str)):
 		full_arr[i] = ord(text_str[i])
 
-	ret_data = np.zeros((len(text_str)+3-1, 3), dtype=np.float32)
-	for i in range(len(text_str)):
-		ret_data[i+3-1] = full_arr[i:i+3]
-	return ret_data
+	return full_arr
 
 
 def extract_rcnn_embedder(full_model):

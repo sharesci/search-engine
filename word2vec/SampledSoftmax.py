@@ -13,8 +13,14 @@ def cross_entropy_with_sampled_softmax(
     bias_init = 0
     ):
 
-	bias = C.layers.Parameter(shape = (vocab_dim, 1), init = bias_init)
-	weights = C.layers.Parameter(shape = (vocab_dim, hidden_dim), init = weights_init)
+	bias = None
+	if bias_init is None:
+		# If bias_init is given as None, disable bias completely
+		bias = C.layers.Constant(np.zeros((vocab_dim, 1)), name="nce_dense_bias")
+	else:
+		bias = C.layers.Parameter(shape = (vocab_dim, 1), init = bias_init, name="nce_dense_bias")
+
+	weights = C.layers.Parameter(shape = (vocab_dim, hidden_dim), init = weights_init, name="nce_dense_weights")
 
 	sample_selector_sparse = C.random_sample(sampling_weights, num_samples, allow_duplicates)
 	sample_selector = sample_selector_sparse
@@ -32,14 +38,14 @@ def cross_entropy_with_sampled_softmax(
 	zSReduced = C.reduce_log_sum_exp(zS)
 
 	# Compute the cross entropy that is used for training.
-	cross_entropy_on_samples = C.log_add_exp(zT, zSReduced) - zT
+	cross_entropy_on_samples = C.alias(C.log_add_exp(zT, zSReduced) - zT, name="sampled_cross_entropy")
 
 	# For applying the model we also output a node providing the input for the full softmax
 	z = C.times_transpose(weights, hidden_vector) + bias
-	z = C.reshape(z, shape = (vocab_dim))
+	z = C.reshape(z, shape = (vocab_dim), name="output_dense")
 
 	zSMax = C.reduce_max(zS)
-	error_on_samples = C.less(zT, zSMax)
+	error_on_samples = C.less(zT, zSMax, name="sampled_error")
 
 	return (z, cross_entropy_on_samples, error_on_samples)
 

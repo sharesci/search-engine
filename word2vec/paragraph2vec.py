@@ -65,7 +65,7 @@ def create_inputs(vocab_dim, num_docs):
 	label_vector = C.ops.input_variable(vocab_dim, np.float32, is_sparse=True)
 	docid_vector = C.ops.input_variable(num_docs, np.float32, is_sparse=True)
 	if cmdargs.word_embedding_method == 'rcnn':
-		input_word_vectors = [C.sequence.input_variable((cmdargs.rcnn_filter_width,), dtype=np.float32, sequence_axis=C.Axis.new_unique_dynamic_axis('word_{}'.format(i))) for i in range(context_size)]
+		input_word_vectors = [C.sequence.input_variable((1,), dtype=np.float32, sequence_axis=C.Axis.new_unique_dynamic_axis('word_{}'.format(i))) for i in range(context_size)]
 	else:
 		input_word_vectors = [C.ops.input_variable(vocab_dim, np.float32, is_sparse=True) for i in range(context_size)]
 	return [label_vector, docid_vector] + input_word_vectors
@@ -78,31 +78,37 @@ def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 		# Embed using recurrent character-level convolutions over the input
 
 		# Placeholder for the input char codes
-		window_input = C.ops.placeholder(cmdargs.rcnn_filter_width)
+		char_input = C.ops.placeholder(1)
 
 		# Reuse weights when embedding each char
 		char_embedding_type = C.layers.Embedding(48)
 
-		# Split up the list of char codes into individual characters so
-		# we can embed each one
-		char_embeds_list = []
-		for i in range(cmdargs.rcnn_filter_width):
-			char_input = C.ops.slice(window_input, 0, i, i+1)
-			onehot_embedding = C.ops.one_hot(char_input, 256, sparse_output=True)
-			char_embeds_list.append(char_embedding_type(onehot_embedding))
-		# Put the individual characters back together
-		char_embeds = C.ops.splice(*char_embeds_list)
+		onehot_embedding = C.ops.one_hot(char_input, 256, sparse_output=True)
+		char_embedding = char_embedding_type(onehot_embedding)
+
+		make_windowed_chars = C.layers.Sequential([
+			tuple(C.layers.Delay(t-(cmdargs.rcnn_filter_width//2)) for t in range(cmdargs.rcnn_filter_width)),
+			C.ops.splice
+		])
+		all_char_embeds = make_windowed_chars(char_embedding)
 
 		# Do some initial Dense layers to process each frame
 		# This is called sliding_conv because each one is called on
 		# just rcnn_filter_width characters for each element of the
 		# sequence, as the filter "slides" (via LSTM) across the whole
 		# input string
-		sliding_conv1 = C.layers.Dense(32, activation=C.ops.tanh)(char_embeds)
-		sliding_conv2 = C.layers.Dense(32, activation=C.ops.tanh)(sliding_conv1)
+		sliding_convs = C.layers.Sequential([
+			C.layers.Dense(all_char_embeds.shape, activation=C.ops.tanh),
+			C.layers.Dense(all_char_embeds.shape, activation=C.ops.tanh),
+		])(all_char_embeds)
+
+		# Residual layer
+		res1 = C.ops.plus(all_char_embeds, sliding_convs)
+
+		fc1 = C.layers.Dense(32, activation=C.ops.tanh)(res1)
 
 		# Collect the Dense outputs for the sequence together into a single vector
-		lstm1 = C.layers.Fold(C.layers.LSTM(96))(sliding_conv2)
+		lstm1 = C.layers.Fold(C.layers.LSTM(96))(fc1)
 
 		# Finally, use a Dense layer to adjust the output size to be
 		# hidden_dim and use this as the word embedding
@@ -113,25 +119,22 @@ def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 		with open(cmdargs.word_embedding_file, 'rb') as f:
 			word_embeddings = np.load(f)
 		if cmdargs.train_word_embeddings:
-			word_embedding_type = C.layers.Embedding(hidden_dim, init=word_embeddings)
+			word_embedding_type = C.layers.Embedding(hidden_dim, init=word_embeddings, name="word_embed")
 		else:
-			print(word_embeddings.shape)
-			word_embedding_type = C.layers.Embedding(weights=word_embeddings)
+			word_embedding_type = C.layers.Embedding(weights=word_embeddings, name="word_embed")
 	else:
 		# Default to the most basic lookup table method
-		word_embedding_type = C.layers.Embedding(hidden_dim)
+		word_embedding_type = C.layers.Embedding(hidden_dim, name="word_embed")
 
 	# Document embedding layer init
 	doc_embedding = None
 	if cmdargs.doc_embedding_init_file == '':
-		doc_embedding = C.layers.Embedding(hidden_dim)(input_list[1])
+		doc_embedding = C.layers.Embedding(hidden_dim, name="doc_embed")(input_list[1])
 	else:
 		doc_embeddings_init = None
 		with open(cmdargs.doc_embedding_init_file, 'rb') as f:
 			doc_embeddings_init = np.load(f)
-		doc_embedding = C.layers.Embedding(hidden_dim, init=doc_embeddings_init)(input_list[1])
-
-	doc_embedding = C.layers.Embedding(hidden_dim)(input_list[1])
+		doc_embedding = C.layers.Embedding(hidden_dim, init=doc_embeddings_init, name="doc_embed")(input_list[1])
 
 
 	word_embeddings = []
@@ -139,7 +142,7 @@ def create_model(input_list, freq_list, vocab_dim, hidden_dim):
 		word_embeddings.append(word_embedding_type(input_list[i+2]))
 
 	all_embeddings = [doc_embedding] + word_embeddings
-	middle_layer = C.ops.splice(*all_embeddings, axis=0)
+	middle_layer = C.ops.splice(*all_embeddings, axis=0, name="hidden_splice")
 
 	smoothed_weights = np.float32(np.power(freq_list, alpha))
 	sampling_weights = C.reshape(C.Constant(smoothed_weights), shape = (1,vocab_dim))
@@ -172,7 +175,7 @@ def train():
 
 	mb_source = None
 	if cmdargs.word_embedding_method == 'rcnn':
-		mb_source = RcnnParagraphMinibatchSource(training_data, {v:k for k,v in token2id.items()}, input_list, cmdargs.rcnn_filter_width, context_size)
+		mb_source = RcnnParagraphMinibatchSource(training_data, {v:k for k,v in token2id.items()}, input_list, context_size)
 	elif cmdargs.word_embedding_method == 'lookup':
 		mb_source = ParagraphMinibatchSource(training_data, context_size)
 	else:
