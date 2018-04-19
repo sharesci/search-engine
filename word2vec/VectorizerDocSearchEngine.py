@@ -17,7 +17,9 @@ from NumpyEmbeddingStorage import NumpyEmbeddingStorage, SparseEmbeddingStorage
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata');
 
 class VectorizerDocSearchEngine:
-	def __init__(self):
+	def __init__(self, vectorizer_type='tfidf_with_word2vec'):
+		self._vectorizer_type = vectorizer_type
+
 		self._reload_all_docs()
 
 
@@ -40,10 +42,17 @@ class VectorizerDocSearchEngine:
 			word_vectors = np.load(f)
 		with open(os.path.join(data_dir, 'word2vec_adjacencies1.npy'), 'rb') as f:
 			word_adj = np.load(f)
-		#self._vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
-		#self._vectorizer = OneShotNetworkDocVectorizer(os.path.join(data_dir, 'directdoc2vec_checkpoint.dnn'), filter_size=3)
-		#self._vectorizer = TfIdfDocVectorizer(token2id, len(token2id.keys()))
-		self._vectorizer = WordvecAdjustedTfIdfDocVectorizer(token2id, len(token2id.keys()), word_vectors, word_adj)
+
+		if self._vectorizer_type == 'word2vec':
+			self._vectorizer = Word2vecDocVectorizer(token2id, os.path.join(data_dir, 'word2vec_vectors.npy'))
+		elif self._vectorizer_type == 'direct':
+			self._vectorizer = OneShotNetworkDocVectorizer(os.path.join(data_dir, 'directdoc2vec_checkpoint.dnn'), filter_size=3)
+		elif self._vectorizer_type == 'tfidf_with_word2vec':
+			self._vectorizer = WordvecAdjustedTfIdfDocVectorizer(token2id, len(token2id.keys()), word_vectors, word_adj)
+		else:
+			self._vectorizer = TfIdfDocVectorizer(token2id, len(token2id.keys()))
+
+		vec_field_name = 'searchengine_vec_' + self._vectorizer_type
 
 		dfs = np.zeros(len(token2id.keys()))
 		doc_embed_list = []
@@ -59,19 +68,18 @@ class VectorizerDocSearchEngine:
 			self._idx2id.append(str(mongo_doc['_id']))
 
 			# Now make sure we have a vector for the doc
-			VEC_FIELD_NAME = 'new_tfidf_vec'
 			if 'other' not in mongo_doc.keys():
 				mongo_doc['other'] = dict()
-			if VEC_FIELD_NAME not in mongo_doc['other'].keys():
+			if vec_field_name not in mongo_doc['other'].keys():
 				raw_embed = self._vectorizer.make_doc_vector(mongo_doc['abstract']).astype(float)
 				# Normalize length
 				norm_embed = raw_embed / np.sum(np.square(raw_embed))
 
-				mongo_doc['other'][VEC_FIELD_NAME] = self._vec_to_sparse_tuples(norm_embed)
+				mongo_doc['other'][vec_field_name] = self._vec_to_sparse_tuples(norm_embed)
 
-				self._mongo_db['papers'].update({'_id': mongo_doc['_id']}, {'$set': {('other.' + VEC_FIELD_NAME): mongo_doc['other'][VEC_FIELD_NAME]}})
+				self._mongo_db['papers'].update({'_id': mongo_doc['_id']}, {'$set': {('other.' + vec_field_name): mongo_doc['other'][vec_field_name]}})
 
-			doc_embed = mongo_doc['other'][VEC_FIELD_NAME]
+			doc_embed = mongo_doc['other'][vec_field_name]
 
 			# Update document frequencies
 			for elem in doc_embed:
@@ -88,6 +96,7 @@ class VectorizerDocSearchEngine:
 		# zeros)
 		#embed_size = max(len(doc_embed) for doc_embed in doc_embed_list)
 
+		vectors_are_sparse = (self._vectorizer_type == 'tfidf' or self._vectorizer_type == 'tfidf_with_word2vec')
 		# Convert embeddings to an official storage object
 		#self._doc_embeds = np.zeros((len(doc_embed_list), embed_size), dtype=np.float64)
 		#for i in range(len(doc_embed_list)):
@@ -125,7 +134,7 @@ class VectorizerDocSearchEngine:
 
 		# Get user history
 		cursor = self._mongo_db['users'].find({'_id': user_id}, {'_id': 1, 'docIds': 1}).limit(1)
-		if cursor.count() == 0:
+		if cursor.count() == 0 or 'docIds' not in cursor[0]:
 			return []
 
 		# Convert user history to vector
