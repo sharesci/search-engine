@@ -251,7 +251,8 @@ class ParagraphVectorDocVectorizer(DocVectorizer):
 	def make_doc_vector(self, text):
 		self._reset_model_doc_embedding(self._model)
 		all_words = self._word_regex.findall(text)
-		for i in range(len(all_words)):
+		num_iterations = np.clip(len(all_words), 200, 10000)
+		for i in range(num_iterations):
 			# Make a minibatch and train
 
 			# Randomly sample a context from the doc
