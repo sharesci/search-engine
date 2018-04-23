@@ -28,6 +28,7 @@ import io
 import numpy as np
 import json
 import sys
+import time
 from VectorizerDocSearchEngine import VectorizerDocSearchEngine
 
 class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -169,8 +170,12 @@ class SearchRequestHandler(http.server.BaseHTTPRequestHandler):
 
 
 	def _do_generic_search(self, search_function, search_param, **kwargs):
+		start_time = time.perf_counter()
 		search_results = search_function(search_param, **kwargs)
 		results_arr = [{'_id': r[1], 'score': r[0]} for r in search_results]
+
+		search_time = time.perf_counter() - start_time
+		print('Finished search in {:0.3f} seconds'.format(search_time))
 
 		response = dict()
 		response['status'] = 200
