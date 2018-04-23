@@ -80,15 +80,15 @@ class TfIdfQueryEngineCore:
 		return TfIdfQueryEngineCore.search_static(query_vector, self._inverted_index, **kwargs)
 
 
-	def _calc_max_possible(term_weights, term_curvals):
+	def _calc_max_possible(term_weights, term_curvals, certainty_factor=1):
 		max_possible = 0
 		for term in term_weights.keys():
 			max_possible += term_weights[term] * term_curvals[term]
 
-		return max_possible
+		return max_possible * certainty_factor
 
 
-	def search_static(query_vector, inverted_index, max_results=sys.maxsize, search_alpha=0.9):
+	def search_static(query_vector, inverted_index, max_results=sys.maxsize, search_alpha=0.9, certainty_factor=1):
 		query_dict = {v[0]: v[1] for v in query_vector}
 		term_infos = {term_id: inverted_index.get_term_info(term_id) for term_id in query_dict.keys()}
 		num_docs = inverted_index.get_num_docs()
@@ -109,7 +109,7 @@ class TfIdfQueryEngineCore:
 		for term_id in available_term_ids:
 			term_gradients[term_id] = term_weights[term_id] * 0.01
 
-		max_possible = TfIdfQueryEngineCore._calc_max_possible(term_weights, term_curvals)
+		max_possible = TfIdfQueryEngineCore._calc_max_possible(term_weights, term_curvals, certainty_factor=certainty_factor)
 		num_results = min(max_results, num_docs)
 
 		# Init the heap to a fixed size for efficient k-max
@@ -134,13 +134,13 @@ class TfIdfQueryEngineCore:
 				term_curvals[cur_term] = 0
 
 				old_max_possible = max_possible
-				max_possible = TfIdfQueryEngineCore._calc_max_possible(term_weights, term_curvals)
+				max_possible = TfIdfQueryEngineCore._calc_max_possible(term_weights, term_curvals, certainty_factor=certainty_factor)
 				term_gradients[term_id] = (1 - search_alpha) * term_gradients[term_id] + search_alpha * (old_max_possible - max_possible)
 
 				continue
 
 			old_max_possible = max_possible
-			max_possible = TfIdfQueryEngineCore._calc_max_possible(term_weights, term_curvals)
+			max_possible = TfIdfQueryEngineCore._calc_max_possible(term_weights, term_curvals, certainty_factor=certainty_factor)
 			term_gradients[term_id] = (1 - search_alpha) * term_gradients[term_id] + search_alpha * (old_max_possible - max_possible)
 
 			if doc_id in scored_doc_ids:
