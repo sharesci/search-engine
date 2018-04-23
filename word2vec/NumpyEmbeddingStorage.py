@@ -1,6 +1,8 @@
 #!/usr/bin/env -p python3
 
 import numpy as np
+import pymongo
+import bson.objectid
 
 ## Wrapper around a numpy array of document or word embeddings.
 #
@@ -24,6 +26,10 @@ class NumpyEmbeddingStorage:
 
 	def embedding_size(self):
 		return self._embeddings_arr.shape[1]
+
+
+	def id_iter(self):
+		return range(len(self._embeddings_arr))
 
 
 	def __len__(self):
@@ -71,12 +77,87 @@ class SparseEmbeddingStorage:
 		return self._embedding_size
 
 
+	def id_iter(self):
+		return range(len(self._embeddings_arr))
+
+
 	def __len__(self):
 		return len(self._embeddings_arr)
 
 
 	def __iter__(self):
 		return EmbeddingStorageIter(self)
+
+
+	def __get__(self, i):
+		return self._get_by_id(i)
+
+
+## Storage that uses MongoDB internally, to reduce the need to store everything
+# in memory.
+#
+class MongoEmbeddingStorage:
+	def __init__(self, mongo_collection_conn, embedding_field_name, embedding_size, is_sparse=False):
+		self._mongo_collection_conn = mongo_collection_conn
+		self._embedding_field_name = embedding_field_name
+		self._embedding_field_list = embedding_field_name.split('.')
+		self._embedding_size = embedding_size
+		self._is_sparse = is_sparse
+
+
+	def put_embedding(self, doc_id, embedding):
+		self._mongo_collection_conn.update({'_id': bson.objectid.ObjectId(doc_id)}, {'$set': {self._embedding_field_name: embedding}})
+
+
+	def _sparse_to_dense(self, vec):
+		arr = np.zeros(self._embedding_size)
+		for j in range(len(vec)):
+			arr[vec[j][0]] = vec[j][1]
+		return arr
+
+	def as_numpy_array(self):
+		arr = np.zeros((len(self._embeddings_arr), self._embedding_size), dtype=np.float32)
+		for i in range(len(self._embeddings_arr)):
+			for j in range(len(self._embeddings_arr[i])):
+				arr[i, self._embeddings_arr[i][j][0]] = self._embeddings_arr[i][j][1]
+		return arr
+
+
+	def get_by_id(self, doc_id):
+		embedding = self._mongo_collection_conn.find_one({
+				'_id': bson.objectid.ObjectId(doc_id),
+				self._embedding_field_name: {'$exists': True}
+			}, projection=['_id', self._embedding_field_name]
+		);
+
+		for subfield in self._embedding_field_list:
+			embedding = embedding[subfield]
+
+		if self._is_sparse:
+			return self._sparse_to_dense(embedding)
+		return np.array(embedding)
+
+
+	def embedding_size(self):
+		return self._embedding_size
+
+
+	def id_iter(self):
+		cursor = self._mongo_collection_conn.find({self._embedding_field_name: {'$exists': True}}, projection=['_id'])
+		embedding_proc_func = str
+		return MongoEmbeddingStorageIter(cursor, ['_id'], embedding_proc_func)
+
+
+	def __len__(self):
+		return self._mongo_collection_conn.find({self._embedding_field_name: {'$exists': True}}).count()
+
+
+	def __iter__(self):
+		cursor = self._mongo_collection_conn.find({self._embedding_field_name: {'$exists': True}}, projection=[self._embedding_field_name])
+		embedding_proc_func = np.array
+		if self._is_sparse:
+			embedding_proc_func = self._sparse_to_dense
+		return MongoEmbeddingStorageIter(cursor, self._embedding_field_list, embedding_proc_func)
 
 
 	def __get__(self, i):
@@ -94,9 +175,32 @@ class EmbeddingStorageIter:
 		return self
 
 
-	def next(self):
+	def __next__(self):
 		if self._index == self._storage_len:
 			raise StopIteration()
 
 		self._index += 1
 		return self._storage[self._index]
+
+
+class MongoEmbeddingStorageIter:
+	def __init__(self, cursor, embedding_field_list, embedding_proc_func):
+		self._cursor = cursor
+		self._embedding_field_list = embedding_field_list
+		self._embedding_proc_func = embedding_proc_func
+
+
+	def __iter__(self):
+		return self
+
+
+	def __next__(self):
+		embedding = self._cursor.next()
+		if embedding is None:
+			raise StopIteration()
+
+		for subfield in self._embedding_field_list:
+			embedding = embedding[subfield]
+
+		return self._embedding_proc_func(embedding)
+
