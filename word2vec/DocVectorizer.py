@@ -211,3 +211,120 @@ class WordvecAdjustedTfIdfDocVectorizer(TfIdfDocVectorizer):
 				vec[near_word_ind] = 1 / self._euclidean_distance(self._word_embeddings[word_ind], self._word_embeddings[near_word_ind])
 		return np.log(vec+1)
 
+
+class ParagraphVectorDocVectorizer(DocVectorizer):
+	def __init__(self, network_file_path, token2id):
+		super().__init__();
+
+		self._model, self._cross_entropy, self._error, self._input_list = self._load_saved_model(network_file_path)
+		self._context_size = len(self._input_list) - 1
+		self._label_input = self._input_list[0]
+
+		self._token2id = token2id
+		self._vocab_dim = len(self._token2id.keys())
+
+		lr_schedule = C.learners.learning_rate_schedule(1e-3, C.learners.UnitType.sample)
+		self._learner = C.learners.sgd(self._model.parameters, lr=lr_schedule,
+				    gradient_clipping_threshold_per_sample=5.0,
+				    gradient_clipping_with_truncation=True)
+
+		self._trainer = C.train.Trainer(self._model, (self._cross_entropy, self._error), [self._learner], progress_writers=None)
+
+		# Pick an ID to assign for words not in the vocabulary
+		# Note: This does overshadow an actual vocab word (unless it
+		# was picked as an unknown word placeholder during training),
+		# so I picked the _last_ vocab word since it is the most likely
+		# to be an uncommon junk word (since it was discovered last)
+		self._unknown_word_index = self._vocab_dim - 1
+
+		self._word_regex = re.compile(r"[ ]*(\w+|\.)(?=[ ]|$)")
+
+
+	def _str_to_inputs(self, text_str):
+		full_arr = np.zeros(len(text_str), dtype=np.float32)
+		for i in range(len(text_str)):
+			full_arr[i] = ord(text_str[i])
+
+		return full_arr
+
+
+	def make_doc_vector(self, text):
+		self._reset_model_doc_embedding(self._model)
+		all_words = self._word_regex.findall(text)
+		for i in range(len(all_words)):
+			# Make a minibatch and train
+
+			# Randomly sample a context from the doc
+			offset = np.random.randint(len(all_words) - self._context_size - 1)
+
+			input_words = all_words[offset:offset+self._context_size]
+			label_word = all_words[offset+self._context_size]
+
+			input_dict = {self._input_list[1+i]: [self._str_to_inputs(input_words[i])] for i in range(self._context_size)}
+
+			# For the label, check if the word is known or not
+			if label_word in self._token2id:
+				input_dict[self._label_input] = C.Value.one_hot(np.array([self._token2id[label_word]], dtype=int), self._vocab_dim)
+			else:
+				input_dict[self._label_input] = C.Value.one_hot(np.array([self._unknown_word_index], dtype=int), self._vocab_dim)
+
+			# Do an update
+			self._trainer.train_minibatch(input_dict)
+
+		# Extract and return the learned value for the doc vector
+		return self._model.find_by_name("doc_embed").asarray()
+
+
+	def make_doc_embedding_storage(self, texts):
+		text_embeddings = []
+		i = 0
+		text_embeddings_arr = np.zeros((len(texts), self._embed_dim))
+		for text in texts:
+			i += 1
+			text_embeddings_arr[i-1][:] = self.make_doc_vector(text)
+
+		return NumpyEmbeddingStorage(text_embeddings_arr)
+
+
+	## Re-initializes the doc vector being trained by the model
+	#
+	def _reset_model_doc_embedding(self, model):
+		
+		doc_embed_node = model.find_by_name("doc_embed")
+		hidden_dim = doc_embed_node.shape[0]
+
+		glorot_uniform_vec = np.random.uniform(-12/hidden_dim, 12/hidden_dim, size=hidden_dim).astype(np.float32)
+
+		doc_embed_node.set_value(C.NDArrayView.from_dense(glorot_uniform_vec))
+
+		return model
+
+
+	## Given a model, extract a list of inputs in the proper order (same order as
+	# create_inputs)
+	#
+	def _get_model_input_list(self, model):
+		misc_inputs = [model.find_by_name('label_input')]
+
+		num_word_inputs = len(model.arguments) - len(misc_inputs)
+		word_inputs = [model.find_by_name("word_input_{}".format(i)) for i in range(num_word_inputs)]
+
+		return misc_inputs + word_inputs 
+
+
+	def _load_saved_model(self, model_filename):
+		model = C.load_model(model_filename)
+
+		doc_embed_node = model.find_by_name("doc_embed")
+		hidden_dim = doc_embed_node.output.shape[0]
+		doc_embed_vec = C.Parameter(hidden_dim, init=C.glorot_uniform(), name="doc_embed")
+
+		model = model.clone(C.CloneMethod.share, {doc_embed_node: doc_embed_vec})
+
+		cross_entropy = model.find_by_name('sampled_cross_entropy')
+		sampled_error = model.find_by_name('sampled_error')
+
+		input_list = self._get_model_input_list(model)
+
+		return model, cross_entropy, sampled_error, input_list
+
