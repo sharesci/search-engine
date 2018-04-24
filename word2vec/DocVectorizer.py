@@ -280,6 +280,9 @@ class ParagraphVectorDocVectorizer(DocVectorizer):
 
 				# Randomly sample a context from each doc
 				for j in range(len(all_words)):
+					if len(all_words[j]) < self._context_size + 2:
+						continue
+
 					input_dict[self._doc_input].append(j)
 					offset = np.random.randint(len(all_words[j]) - self._context_size - 1)
 
