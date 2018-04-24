@@ -126,6 +126,8 @@ class TfIdfDocVectorizer(DocVectorizer):
 
 
 	def make_doc_vector(self, text):
+		text = text.lower()
+
 		vec = np.zeros(self._vocab_size)
 		for token in self._token_regex.findall(text):
 			if token in self._token2id:
@@ -179,7 +181,7 @@ class WordvecAdjustedTfIdfDocVectorizer(TfIdfDocVectorizer):
 	# words, nearest_k will be reduced to the largest number of neighbors
 	# available in word_neighbors.
 	#
-	def __init__(self, token2id, vocab_size, word_embeddings, word_neighbors, nearest_k=5):
+	def __init__(self, token2id, vocab_size, word_embeddings, word_neighbors, nearest_k=3):
 		super().__init__(token2id, vocab_size);
 
 		self._token2id = token2id
@@ -198,6 +200,8 @@ class WordvecAdjustedTfIdfDocVectorizer(TfIdfDocVectorizer):
 		
 
 	def make_doc_vector(self, text):
+		text = text.lower()
+
 		vec = np.zeros(self._vocab_size)
 		for token in self._token_regex.findall(text):
 			if token not in self._token2id:
@@ -217,13 +221,14 @@ class ParagraphVectorDocVectorizer(DocVectorizer):
 		super().__init__();
 
 		self._model, self._cross_entropy, self._error, self._input_list = self._load_saved_model(network_file_path)
-		self._context_size = len(self._input_list) - 1
+		self._context_size = len(self._input_list) - 2
 		self._label_input = self._input_list[0]
+		self._doc_input = self._input_list[1]
 
 		self._token2id = token2id
 		self._vocab_dim = len(self._token2id.keys())
 
-		lr_schedule = C.learners.learning_rate_schedule(1e-3, C.learners.UnitType.sample)
+		lr_schedule = C.learners.learning_rate_schedule(2e-3, C.learners.UnitType.sample)
 		self._learner = C.learners.sgd(self._model.parameters, lr=lr_schedule,
 				    gradient_clipping_threshold_per_sample=5.0,
 				    gradient_clipping_with_truncation=True)
@@ -248,32 +253,67 @@ class ParagraphVectorDocVectorizer(DocVectorizer):
 		return full_arr
 
 
-	def make_doc_vector(self, text):
-		self._reset_model_doc_embedding(self._model)
-		all_words = self._word_regex.findall(text)
-		num_iterations = np.clip(len(all_words), 200, 10000)
-		for i in range(num_iterations):
-			# Make a minibatch and train
+	def make_doc_vectors(self, all_texts):
+		all_texts = [text.lower() for text in all_texts]
 
-			# Randomly sample a context from the doc
-			offset = np.random.randint(len(all_words) - self._context_size - 1)
+		# Depending on how big the embedding layer is, we may need to do multiple batches
+		num_batches = int(np.ceil(len(all_texts) / self._doc_input.shape[0]))
 
-			input_words = all_words[offset:offset+self._context_size]
-			label_word = all_words[offset+self._context_size]
+		final_array = None
 
-			input_dict = {self._input_list[1+i]: [self._str_to_inputs(input_words[i])] for i in range(self._context_size)}
+		for batch_num in range(num_batches):
+			start_index = batch_num * self._doc_input.shape[0]
+			end_index = (batch_num + 1) * self._doc_input.shape[0]
+			texts = all_texts[start_index:end_index]
 
-			# For the label, check if the word is known or not
-			if label_word in self._token2id:
-				input_dict[self._label_input] = C.Value.one_hot(np.array([self._token2id[label_word]], dtype=int), self._vocab_dim)
+			self._reset_model_doc_embeddings(self._model)
+			all_words = [self._word_regex.findall(text) for text in texts]
+			num_iterations = np.clip(sum(len(words) for words in all_words)//len(all_words), 400, 20000)
+
+			# Save some memory, since we don't need the raw text anymore
+			texts = None
+
+			for _ in range(num_iterations):
+				# Make a minibatch and train
+
+				input_dict = {input_var: [] for input_var in self._input_list}
+
+				# Randomly sample a context from each doc
+				for j in range(len(all_words)):
+					input_dict[self._doc_input].append(j)
+					offset = np.random.randint(len(all_words[j]) - self._context_size - 1)
+
+					input_words = all_words[j][offset:offset+self._context_size]
+					label_word = all_words[j][offset+self._context_size]
+
+					for k in range(self._context_size):
+						input_dict[self._input_list[2+k]].append(self._str_to_inputs(input_words[k]))
+
+					# For the label, check if the word is known or not
+					if label_word in self._token2id:
+						input_dict[self._label_input].append(self._token2id[label_word])
+					else:
+						input_dict[self._label_input].append(self._unknown_word_index)
+
+				input_dict[self._doc_input] = C.Value.one_hot(np.array(input_dict[self._doc_input], dtype=int), self._doc_input.shape[0])
+				input_dict[self._label_input] = C.Value.one_hot(np.array(input_dict[self._label_input], dtype=int), self._vocab_dim)
+
+				# Do an update
+				self._trainer.train_minibatch(input_dict)
+
+			# Extract the learned value for the doc vector
+			cur_array = self._model.find_by_name("doc_embed").E.asarray()[:len(all_words)]
+			if final_array is None:
+				final_array = cur_array
 			else:
-				input_dict[self._label_input] = C.Value.one_hot(np.array([self._unknown_word_index], dtype=int), self._vocab_dim)
+				final_array = np.vstack([final_array, cur_array])
 
-			# Do an update
-			self._trainer.train_minibatch(input_dict)
+		return final_array
 
-		# Extract and return the learned value for the doc vector
-		return self._model.find_by_name("doc_embed").asarray()
+
+	def make_doc_vector(self, text):
+		embed_matrix = self.make_doc_vectors([text])
+		return embed_matrix[0]
 
 
 	def make_doc_embedding_storage(self, texts):
@@ -289,14 +329,12 @@ class ParagraphVectorDocVectorizer(DocVectorizer):
 
 	## Re-initializes the doc vector being trained by the model
 	#
-	def _reset_model_doc_embedding(self, model):
-		
+	def _reset_model_doc_embeddings(self, model):
 		doc_embed_node = model.find_by_name("doc_embed")
-		hidden_dim = doc_embed_node.shape[0]
+		hidden_dim = doc_embed_node.E.shape[1]
 
-		glorot_uniform_vec = np.random.uniform(-12/hidden_dim, 12/hidden_dim, size=hidden_dim).astype(np.float32)
-
-		doc_embed_node.set_value(C.NDArrayView.from_dense(glorot_uniform_vec))
+		glorot_uniform_vec = np.random.uniform(-12/hidden_dim, 12/hidden_dim, size=doc_embed_node.E.shape).astype(np.float32)
+		doc_embed_node.E.set_value(C.NDArrayView.from_dense(glorot_uniform_vec))
 
 		return model
 
@@ -305,7 +343,7 @@ class ParagraphVectorDocVectorizer(DocVectorizer):
 	# create_inputs)
 	#
 	def _get_model_input_list(self, model):
-		misc_inputs = [model.find_by_name('label_input')]
+		misc_inputs = [model.find_by_name('label_input'), model.find_by_name("doc_input")]
 
 		num_word_inputs = len(model.arguments) - len(misc_inputs)
 		word_inputs = [model.find_by_name("word_input_{}".format(i)) for i in range(num_word_inputs)]
@@ -313,14 +351,13 @@ class ParagraphVectorDocVectorizer(DocVectorizer):
 		return misc_inputs + word_inputs 
 
 
-	def _load_saved_model(self, model_filename):
-		model = C.load_model(model_filename)
-
+	def _resize_embedding_layer(self, model, num_embeddings=1):
 		doc_embed_node = model.find_by_name("doc_embed")
 		hidden_dim = doc_embed_node.output.shape[0]
-		doc_embed_vec = C.Parameter(hidden_dim, init=C.glorot_uniform(), name="doc_embed")
+		doc_input_var = C.input_variable(num_embeddings, is_sparse=True, name="doc_input")
+		doc_embed_layer = C.layers.Embedding(hidden_dim, init=C.glorot_uniform(), name="doc_embed")(doc_input_var)
 
-		model = model.clone(C.CloneMethod.share, {doc_embed_node: doc_embed_vec})
+		model = model.clone(C.CloneMethod.freeze, {doc_embed_node: doc_embed_layer})
 
 		cross_entropy = model.find_by_name('sampled_cross_entropy')
 		sampled_error = model.find_by_name('sampled_error')
@@ -328,4 +365,12 @@ class ParagraphVectorDocVectorizer(DocVectorizer):
 		input_list = self._get_model_input_list(model)
 
 		return model, cross_entropy, sampled_error, input_list
+
+
+	def _load_saved_model(self, model_filename):
+		model = C.load_model(model_filename)
+
+		return self._resize_embedding_layer(model, num_embeddings=1000)
+
+
 

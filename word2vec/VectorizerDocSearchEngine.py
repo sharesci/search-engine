@@ -54,19 +54,31 @@ class VectorizerDocSearchEngine:
 		return [(int(x[0]), float(x[1])) for x in zip(nonzeros, vec[nonzeros])]
 
 
-	def _flush_new_docs(self, new_docs):
-		self._inverted_index.index_documents(new_docs)
+	def _flush_new_tfidf_docs(self, new_tfidf_docs):
+		if len(new_tfidf_docs) == 0:
+			return
+		self._inverted_index.index_documents(new_tfidf_docs)
 
 		# Set a boolean flag to indicate these document vectors is now indexed
-		new_doc_ids = [doc[0] for doc in new_docs]
+		new_doc_ids = [doc[0] for doc in new_tfidf_docs]
 		self._mongo_db['papers'].update({'_id': {'$in': new_doc_ids} }, {'$set': {('other.' + self._tfidf_vec_field_name): True}}, multi=True)
+
+
+	def _flush_new_para2vec_docs(self, new_para2vec_docs):
+		if len(new_para2vec_docs) == 0:
+			return
+		texts = [doc[1] for doc in new_para2vec_docs]
+		vectors = self._paragraph_vectorizer.make_doc_vectors(texts).astype(float)
+		for i in range(len(new_para2vec_docs)):
+			self._mongo_db['papers'].update({'_id': new_para2vec_docs[i][0] }, {'$set': {('other.' + self._paragraph_vec_field_name): list(vectors[i])}})
 
 
 	def _reload_all_docs(self):
 		print('Reloading...')
 		start_time = time.perf_counter()
 
-		new_docs = []
+		new_tfidf_docs = []
+		new_para2vec_docs = []
 
 		num_newly_vectorized = {'paragraph2vec': 0, 'tfidf': 0}
 		doc_query = {'$or': [
@@ -80,23 +92,23 @@ class VectorizerDocSearchEngine:
 				raw_embed = self._tfidf_vectorizer.make_doc_vector(mongo_doc[text_field]).astype(float)
 				norm_embed = self._vec_to_sparse_tuples(raw_embed / np.sum(np.square(raw_embed)))
 
-				new_docs.append((mongo_doc['_id'], norm_embed))
+				new_tfidf_docs.append((mongo_doc['_id'], norm_embed))
 				num_newly_vectorized['tfidf'] += 1
 
 			if 'other' not in mongo_doc or self._paragraph_vec_field_name not in mongo_doc['other']:
 				text_field = 'body' if 'body' in mongo_doc else 'abstract'
-				embed = list(self._paragraph_vectorizer.make_doc_vector(mongo_doc[text_field]).astype(float))
-
-				self._mongo_db['papers'].update({'_id': mongo_doc['_id'] }, {'$set': {('other.' + self._paragraph_vec_field_name): embed}})
-
+				new_para2vec_docs.append((mongo_doc['_id'], mongo_doc[text_field]))
 				num_newly_vectorized['paragraph2vec'] += 1
 
-			if 2000 < len(new_docs):
-				self._flush_new_docs(new_docs)
-				new_docs = []
+			if 900 < len(new_para2vec_docs):
+				self._flush_new_para2vec_docs(new_para2vec_docs)
+				new_para2vec_docs = []
+			if 2000 < len(new_tfidf_docs):
+				self._flush_new_tfidf_docs(new_tfidf_docs)
+				new_tfidf_docs = []
 
-		self._flush_new_docs(new_docs)
-		new_docs = []
+		self._flush_new_para2vec_docs(new_para2vec_docs)
+		self._flush_new_tfidf_docs(new_tfidf_docs)
 
 		self._query_engine = TfIdfQueryEngineCore(self._inverted_index)
 
