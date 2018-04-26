@@ -26,6 +26,8 @@ data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'large
 class VectorizerDocSearchEngine:
 	def __init__(self):
 
+		self._default_max_results = 10
+
 		# We expect a MongoDB instance to be running. It should have
 		# database 'sharesci', where token2id and id2freq are stored in
 		# a 'special_objects' collection
@@ -143,7 +145,7 @@ class VectorizerDocSearchEngine:
 	def search_qs(self, query, **generic_search_kwargs):
 		query = re.sub(r"\s+", " ", query.lower())
 
-		cache_extra_keys = {'max_results': 10, 'offset': 0}
+		cache_extra_keys = {'max_results': self._default_max_results, 'offset': 0}
 		if 'max_results' in generic_search_kwargs:
 			cache_extra_keys['max_results'] = generic_search_kwargs['max_results']
 		if 'offset' in generic_search_kwargs:
@@ -210,9 +212,9 @@ class VectorizerDocSearchEngine:
 		return results
 
 
-	def search_userid(self, user_id, max_results=sys.maxsize, offset=0, getFullDocs=False, history_window=100):
+	def search_userid(self, user_id, max_results=0, offset=0, getFullDocs=False, history_window=100):
 		if max_results == 0:
-			max_results = sys.maxsize
+			max_results = self._default_max_results
 
 		cache_extra_keys = {'max_results': max_results, 'offset': offset}
 		main_key = 'search_userid.' + str(user_id)
@@ -336,9 +338,9 @@ class VectorizerDocSearchEngine:
 		return results
 
 
-	def search_queryvec(self, query_vec, max_results=sys.maxsize, offset=0, getFullDocs=False, **kwargs):
+	def search_queryvec(self, query_vec, max_results=0, offset=0, getFullDocs=False, **kwargs):
 		if max_results == 0:
-			max_results = sys.maxsize
+			max_results = self._default_max_results
 
 		results = self._query_engine.search(query_vec, max_results=(offset+max_results), **kwargs)[offset:(offset+max_results)]
 
