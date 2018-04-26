@@ -15,7 +15,7 @@ class MongoInvertedIndex:
 	# <br>  A PyMongo connection to the MongoDb collection holding the
 	#       inverted index.
 	#
-	def __init__(self, mongo_collection, mongo_special_objects_coll, mongo_doc_vector_coll, doc_vector_type_name, max_blob_size=10000, split_inflation_factor=4):
+	def __init__(self, mongo_collection, mongo_special_objects_coll, mongo_doc_vector_coll, doc_vector_type_name, max_blob_size=6000, split_inflation_factor=4):
 		self._mongo_coll = mongo_collection
 		self._mongo_specialobj = mongo_special_objects_coll
 		self._mongo_doc_vector_coll = mongo_doc_vector_coll
@@ -236,6 +236,7 @@ class MongoInvertedIndex:
 			if not isinstance(docs[i][0], bson.objectid.ObjectId):
 				raise ValueError("doc_id must be an ObjectId")
 
+		num_skipped = 0
 
 		# dict mapping term to a list of (doc_id, val) tuples to insert
 		term_doc_lists = dict()
@@ -246,7 +247,13 @@ class MongoInvertedIndex:
 			doc_vector = doc[1]
 
 			# Update document vectors collection
-			self._mongo_doc_vector_coll.update_one({'_id': doc_id}, {'$set': {self._doc_vector_type_name: doc_vector}}, upsert=True)
+			try:
+				self._mongo_doc_vector_coll.update_one({'_id': doc_id}, {'$set': {self._doc_vector_type_name: doc_vector}}, upsert=True)
+			except pymongo.errors.DocumentTooLarge:
+				# If we couldn't insert, just skip this doc for now
+				num_skipped += 1
+				print("ERROR: Failed to insert vector for doc_id {}".format(str(doc_id)))
+				continue
 
 			for doc_term in doc_vector:
 				term_id = doc_term[0]
@@ -263,7 +270,7 @@ class MongoInvertedIndex:
 
 		# Update the doc counter in Mongo
 		num_docs = self.get_num_docs()
-		self._mongo_specialobj.update_one({'key': 'inverted_index_num_docs'}, {'$set': {'value': num_docs + len(docs)}}, upsert=True)
+		self._mongo_specialobj.update_one({'key': 'inverted_index_num_docs'}, {'$set': {'value': num_docs + len(docs) - num_skipped}}, upsert=True)
 
 
 ## Iterator over the document list for a term.
