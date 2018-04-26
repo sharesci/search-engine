@@ -14,6 +14,7 @@ class SimpleCache:
 
 	def _garbage_collect(self):
 		cur_time = time.time()
+		keys_to_remove = set()
 		for main_key in self._cache:
 			to_remove = []
 			for entry in self._cache[main_key]:
@@ -21,11 +22,13 @@ class SimpleCache:
 					to_remove.append(entry)
 			# Shortcut when removing all entries
 			if len(to_remove) == len(self._cache[main_key]):
-				del self._cache[main_key]
+				keys_to_remove.add(main_key)
 				continue
 
 			for entry in to_remove:
 				self._cache[main_key].remove(entry)
+		for key in keys_to_remove:
+			del self._cache[key]
 
 	
 	## Returns a result set if a cached one is found for the given
