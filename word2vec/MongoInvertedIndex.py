@@ -4,6 +4,7 @@ import json
 import sys
 import pymongo
 import bson.objectid
+from SimpleCache import SimpleCache
 
 
 ## Interface for an inverted index using MongoDB as a backend.
@@ -22,6 +23,21 @@ class MongoInvertedIndex:
 		self._doc_vector_type_name = doc_vector_type_name
 		self._max_blob_size = max_blob_size
 		self._split_inflation_factor = split_inflation_factor
+
+		self._cache = SimpleCache(max_age = 600)
+
+
+	def _find_index_blob_by_termid(self, term_id):
+		main_key = 'termid.' + str(term_id)
+		cached_entry = self._cache.get(main_key, {})
+		if cached_entry is not None:
+			return cached_entry
+
+		result = self._mongo_coll.find_one({'term_id': term_id})
+		if result is not None:
+			self._cache.add(main_key, {}, result)
+
+		return result
 
 
 	def get_doc_vector(self, doc_id):
@@ -51,7 +67,7 @@ class MongoInvertedIndex:
 	## Returns a `TermIterator` for the given `term_id`.
 	#
 	def get_term_iterator(self, term_id):
-		first_blob = self._mongo_coll.find_one({'term_id': term_id})
+		first_blob = self._find_index_blob_by_termid(term_id)
 		return TermIterator(self._mongo_coll, first_blob)
 
 
