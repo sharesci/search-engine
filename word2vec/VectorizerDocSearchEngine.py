@@ -17,6 +17,7 @@ from QueryEngineCore import ComparatorQueryEngineCore, AnnoyQueryEngineCore, TfI
 from DocVectorizer import Word2vecDocVectorizer, TfIdfDocVectorizer, OneShotNetworkDocVectorizer, WordvecAdjustedTfIdfDocVectorizer, ParagraphVectorDocVectorizer
 from NumpyEmbeddingStorage import NumpyEmbeddingStorage, SparseEmbeddingStorage, MongoEmbeddingStorage
 from MongoInvertedIndex import MongoInvertedIndex
+from SimpleCache import SimpleCache
 
 
 data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'largedata');
@@ -49,71 +50,9 @@ class VectorizerDocSearchEngine:
 
 		self._query_engine = TfIdfQueryEngineCore(self._inverted_index)
 
-		self._cache = dict()
-		self._max_cache_age = 7200   # seconds
-		self._cache_access_counter = 0
+		self._cache = SimpleCache(max_age=7200)
 
 		self._reload_all_docs()
-
-
-	def _garbage_collect_caches(self):
-		cur_time = time.time()
-		for main_key in self._cache:
-			to_remove = []
-			for entry in self._cache[main_key]:
-				if entry['expire_time'] < cur_time:
-					to_remove.append(entry)
-			# Shortcut when removing all entries
-			if len(to_remove) == len(self._cache[main_key]):
-				del self._cache[main_key]
-				continue
-
-			for entry in to_remove:
-				self._cache[main_key].remove(entry)
-
-	
-	## Returns a result set if a cached one is found for the given
-	# parameters. If there is not a cache hit, returns None.
-	#
-	def _get_results_from_cache(self, main_key, extra_keys):
-		if main_key not in self._cache:
-			return None
-
-		cache_entries = self._cache[main_key]
-		for entry in cache_entries:
-			# We intentionally only check against the given extra
-			# keys here, even if the cache entry itself had more
-			# extra keys
-			is_match = True
-			for key in extra_keys:
-				if key not in entry['extra_keys'] or entry['extra_keys'][key] != extra_keys[key]:
-					is_match = False
-					break
-			if not is_match:
-				continue
-
-			if entry['expire_time'] <= time.time():
-				cache_entries.remove(entry)
-				break
-
-			return entry['value']
-
-		return None
-
-
-	def _add_to_cache(self, main_key, extra_keys, value):
-		self._cache_access_counter += 1
-		if 20 < self._cache_access_counter:
-			self._garbage_collect_caches()
-
-		if main_key not in self._cache:
-			self._cache[main_key] = []
-
-		self._cache[main_key].append({
-			'expire_time': time.time() + self._max_cache_age,
-			'extra_keys': extra_keys,
-			'value': value
-		});
 
 
 	def _vec_to_sparse_tuples(self, vec):
@@ -210,7 +149,7 @@ class VectorizerDocSearchEngine:
 		if 'offset' in generic_search_kwargs:
 			cache_extra_keys['offset'] = generic_search_kwargs['offset']
 		main_key = 'search_qs.' + query
-		cached_result = self._get_results_from_cache(main_key, cache_extra_keys)
+		cached_result = self._cache.get(main_key, cache_extra_keys)
 		if cached_result is not None:
 			return cached_result
 
@@ -218,7 +157,7 @@ class VectorizerDocSearchEngine:
 		query_vec = self._vec_to_sparse_tuples(query_vec)
 		results = self.search_queryvec(query_vec, **generic_search_kwargs)
 
-		self._add_to_cache(main_key, cache_extra_keys, results)
+		self._cache.add(main_key, cache_extra_keys, results)
 
 		return results
 
@@ -229,7 +168,7 @@ class VectorizerDocSearchEngine:
 
 		cache_extra_keys = {'max_results': max_results, 'offset': offset}
 		main_key = 'search_docid.' + str(doc_id)
-		cached_result = self._get_results_from_cache(main_key, cache_extra_keys)
+		cached_result = self._cache.get(main_key, cache_extra_keys)
 		if cached_result is not None:
 			return cached_result
 
@@ -266,7 +205,7 @@ class VectorizerDocSearchEngine:
 			return []
 
 		results = final_results[offset:offset+max_results]
-		self._add_to_cache(main_key, cache_extra_keys, results)
+		self._cache.add(main_key, cache_extra_keys, results)
 
 		return results
 
@@ -277,7 +216,7 @@ class VectorizerDocSearchEngine:
 
 		cache_extra_keys = {'max_results': max_results, 'offset': offset}
 		main_key = 'search_userid.' + str(user_id)
-		cached_result = self._get_results_from_cache(main_key, cache_extra_keys)
+		cached_result = self._cache.get(main_key, cache_extra_keys)
 		if cached_result is not None:
 			return cached_result
 
@@ -392,7 +331,7 @@ class VectorizerDocSearchEngine:
 
 		# Convert the doc IDs into strings
 		results = [(score, str(doc_id)) for score, doc_id in results]
-		self._add_to_cache(main_key, cache_extra_keys, results)
+		self._cache.add(main_key, cache_extra_keys, results)
 
 		return results
 
