@@ -88,7 +88,7 @@ class TfIdfQueryEngineCore:
 		return max_possible * certainty_factor
 
 
-	def search_static(query_vector, inverted_index, max_results=sys.maxsize, search_alpha=0.9, certainty_factor=1):
+	def search_static(query_vector, inverted_index, max_results=10, search_alpha=0.9, certainty_factor=1):
 		query_dict = {v[0]: v[1] for v in query_vector}
 		term_infos = {term_id: inverted_index.get_term_info(term_id) for term_id in query_dict.keys()}
 		num_docs = inverted_index.get_num_docs()
@@ -97,6 +97,7 @@ class TfIdfQueryEngineCore:
 		term_iterators = dict()
 		term_curvals = dict()
 		term_gradients = dict()
+		term_depths_debug = dict()
 		available_term_ids = list(term_id for term_id in query_dict.keys())
 		for term_id in available_term_ids:
 			if term_infos[term_id] is None or 'df' not in term_infos[term_id]:
@@ -105,6 +106,7 @@ class TfIdfQueryEngineCore:
 				term_weights[term_id] = np.log(num_docs / (term_infos[term_id]['df'] + 1)) * query_dict[term_id]
 			term_iterators[term_id] = inverted_index.get_term_iterator(term_id)
 			term_curvals[term_id] = 1
+			term_depths_debug[term_id] = 0
 
 		for term_id in available_term_ids:
 			term_gradients[term_id] = term_weights[term_id] * 0.01
@@ -113,9 +115,12 @@ class TfIdfQueryEngineCore:
 		num_results = min(max_results, num_docs)
 
 		# Init the heap to a fixed size for efficient k-max
-		scores_heap = [(-sys.maxsize, None)] * num_results
+		scores_heap = [(-sys.maxsize, None)] * int(num_results)
 
 		scored_doc_ids = set()
+
+		# Queue of documents needing to be scored
+		doc_id_queue = set()
 
 		while scores_heap[0][0] < max_possible and len(available_term_ids) != 0:
 			# Pick the next term to advance
@@ -123,7 +128,7 @@ class TfIdfQueryEngineCore:
 				cur_term = random.choice(available_term_ids)
 			else:
 				cur_term = max(available_term_ids, key=lambda x: term_gradients[x])
-
+			term_depths_debug[cur_term] += 1
 			doc_id = None
 			val = None
 			try:
@@ -146,16 +151,23 @@ class TfIdfQueryEngineCore:
 			if doc_id in scored_doc_ids:
 				continue
 
-			# Compute score for uncovered doc via cosine similarity
-			doc_vector = inverted_index.get_doc_vector(doc_id)
-			doc_score = sum(term_weights[v[0]] * v[1] for v in doc_vector if v[0] in term_weights)
-
+			doc_id_queue.add(doc_id)
 			scored_doc_ids.add(doc_id)
+			if len(doc_id_queue) < 150:
+				continue
 
-			# Note this is a min-heap, so top will be the WORST
-			# match. We push the current score, then pop the top to
-			# get rid of the worst match
-			heapq.heappushpop(scores_heap, (doc_score, doc_id))
+			doc_records = inverted_index.get_doc_vectors(list(doc_id_queue))
+			for doc_record in doc_records:
+				# Compute score for uncovered doc via cosine similarity
+				doc_vector = doc_record[inverted_index._doc_vector_type_name]
+				doc_score = sum(term_weights[v[0]] * v[1] for v in doc_vector if v[0] in term_weights)
+
+
+				# Note this is a min-heap, so top will be the WORST
+				# match. We push the current score, then pop the top to
+				# get rid of the worst match
+				heapq.heappushpop(scores_heap, (doc_score, doc_record['_id']))
+			doc_id_queue.clear()
 
 		# Get the result array
 		results = []
