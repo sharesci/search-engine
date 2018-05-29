@@ -9,6 +9,7 @@ import re
 from sklearn.feature_extraction.text import CountVectorizer
 import sys
 import time
+from SimpleCache import SimpleCache
 
 DEFAULT_QUERY_WEIGHTS = {
     'fulltext': 0.4,
@@ -24,19 +25,27 @@ class PsqlTfIdfDocSearchEngine:
     wiki_collection = None
     
     def __init__(self):
-        self.pg_conn = psycopg2.connect("dbname='sharesci' user='sharesci' host='127.0.0.1' password='sharesci'")
+        self.pg_conn = psycopg2.connect("dbname='test_sharesci' user='sharesci' host='127.0.0.1' password='sharesci'")
         mongo_client = pymongo.MongoClient('127.0.0.1', 27017)
 
         self.mongo_db = mongo_client['sharesci']
         self.wiki_collection = self.mongo_db['wiki']
 
         self.stemmer = PorterStemmer(mode=PorterStemmer.MARTIN_EXTENSIONS)
+        self._cache = SimpleCache()
 
 
     def search_qs(self, query, max_results=sys.maxsize, offset=0, getFullDocs=False):
         if query is None or not re.match(r'[ \w]*\w[ \w]*', query):
             print('fail1')
             return
+        query = re.sub(r"\s+", " ", query.lower())
+    
+        cache_extra_keys = {'max_results': max_results, 'offset': offset}
+        main_key = 'search_qs.' + query
+        cached_result = self._cache.get(main_key, cache_extra_keys)
+        if cached_result is not None:
+            return cached_result
 
         query_vec = self.make_query_vector(query)
 
@@ -57,7 +66,11 @@ class PsqlTfIdfDocSearchEngine:
         query_l2 = np.sqrt(query_l2)
         query_tuples = [(tup[0], tup[1] / query_l2) for tup in query_tuples]
 
-        return self.query_cosine_similarities(query_tuples, max_results=max_results, weights=DEFAULT_QUERY_WEIGHTS)
+        results = self.query_cosine_similarities(query_tuples, max_results=max_results, weights=DEFAULT_QUERY_WEIGHTS)
+
+        self._cache.add(main_key, cache_extra_keys, results)
+
+        return results
 
     ## Compute the most similar documents, given a query vector
     #
