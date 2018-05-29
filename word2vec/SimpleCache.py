@@ -1,4 +1,5 @@
 import time
+import pickle
 
 class SimpleCache:
 	## Constructor.
@@ -6,10 +7,12 @@ class SimpleCache:
 	# @param max_age
 	# <br>  The max age, in seconds, of a cache value before it expires
 	#
-	def __init__(self, max_age=600):
+	def __init__(self, max_age=86400, persist_to_file=False):
 		self._cache = dict()
 		self._max_cache_age = max_age
 		self._gc_counter = 0
+
+		self._persist_to_file = persist_to_file
 
 
 	def _garbage_collect(self):
@@ -29,6 +32,15 @@ class SimpleCache:
 				self._cache[main_key].remove(entry)
 		for key in keys_to_remove:
 			del self._cache[key]
+
+		if self._persist_to_file:
+			with open(str(self._max_cache_age) + '_cachesave.pickle', 'wb') as f:
+				pickle.dump(self._cache, f)
+
+
+	def clear(self):
+		self._cache = dict()
+		self._gc_counter = 0
 
 	
 	## Returns a result set if a cached one is found for the given
@@ -62,7 +74,7 @@ class SimpleCache:
 
 	def add(self, main_key, extra_keys, value):
 		self._gc_counter += 1
-		if 20 < self._gc_counter:
+		if 100 < self._gc_counter:
 			self._garbage_collect()
 			self._gc_counter = 0
 
