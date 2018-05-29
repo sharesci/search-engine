@@ -24,7 +24,7 @@ class MongoInvertedIndex:
 		self._max_blob_size = max_blob_size
 		self._split_inflation_factor = split_inflation_factor
 
-		self._cache = SimpleCache(max_age = 600)
+		self._cache = SimpleCache(max_age = 1800)
 
 
 	def _find_index_blob_by_termid(self, term_id):
@@ -42,6 +42,13 @@ class MongoInvertedIndex:
 
 	def get_doc_vector(self, doc_id):
 		return self._mongo_doc_vector_coll.find_one({'_id': doc_id, self._doc_vector_type_name: {'$exists': True}}, {self._doc_vector_type_name: True})[self._doc_vector_type_name]
+
+	def get_doc_vectors(self, doc_ids):
+		docs = []
+		cursor = self._mongo_doc_vector_coll.find({'_id': {'$in': doc_ids}, self._doc_vector_type_name: {'$exists': True}}, {'_id': True, self._doc_vector_type_name: True})
+		for doc in cursor:
+			docs.append(doc)
+		return docs
 
 
 	def get_num_docs(self):
