@@ -7,6 +7,7 @@ import sklearn.svm
 import time
 import heapq
 import re
+import pickle
 
 import pymongo
 import bson.objectid
@@ -177,7 +178,8 @@ class VectorizerDocSearchEngine:
 		# Start with a TF-IDF search to get a rough set of candidates
 		qs_max_results = max_results * 2 + offset
 		querydoc_tfvec = self._inverted_index.get_doc_vector(doc_id);
-		base_results = self._query_engine.search(querydoc_tfvec, certainty_factor=0.5, max_results=qs_max_results)
+		certainty_factor = min(1, 8/(len(querydoc_tfvec)+1))
+		base_results = self._query_engine.search(querydoc_tfvec, certainty_factor=certainty_factor, max_results=qs_max_results)
 
 		# Now re-rank the candidates based on paragraph vector nearest neighbor
 		mongo_querydoc = self._mongo_db['papers'].find_one({'_id': doc_id, ('other.' + self._paragraph_vec_field_name): {'$exists': True}}, {'_id': True, ('other.' + self._paragraph_vec_field_name): True})
